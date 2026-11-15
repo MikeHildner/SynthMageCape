@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The manifest is what Android reads at install time: what the app is called,
+     which screens it has, and which permissions it wants. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Find nearby Bluetooth LE devices.
+         neverForLocation is a promise that scan results are not used to work out
+         where the phone is. In return Android does not also demand the location
+         permission. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Connect to a device and exchange data with it; also needed to read a
+         device's name and to ask the user to switch Bluetooth on. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Declaring a permission here is necessary but not sufficient: both of the
+         above are "runtime" permissions, so the app must also ask the user while
+         it is running (see BluetoothPermissionGate.kt). The user sees them as one
+         prompt, "Nearby devices". -->
+
+    <!-- The app is useless without Bluetooth LE, so say so. -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+
+    <application
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <!-- exported="true" plus the MAIN/LAUNCHER filter is what puts an icon
+             in the phone's app drawer and lets the launcher start this screen. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>
