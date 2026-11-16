@@ -65,7 +65,7 @@
   },
   "hw": {
     "led": {
-      "total": 97,
+      "total": 193,
       "maxpwr": 1500,
       "cct": false,
       "cr": false,
@@ -74,7 +74,7 @@
       "fps": 42,
       "rgbwm": 255,
       "matrix": {
-        "mpc": 1,
+        "mpc": 2,
         "panels": [
           {
             "b": false,
@@ -82,6 +82,16 @@
             "v": true,
             "s": true,
             "x": 0,
+            "y": 0,
+            "h": 48,
+            "w": 2
+          },
+          {
+            "b": false,
+            "r": false,
+            "v": true,
+            "s": true,
+            "x": 2,
             "y": 0,
             "h": 48,
             "w": 2
@@ -109,6 +119,24 @@
         },
         {
           "start": 96,
+          "len": 96,
+          "pin": [
+            5
+          ],
+          "order": 0,
+          "rev": false,
+          "skip": 0,
+          "type": 22,
+          "ref": false,
+          "rgbwm": 0,
+          "freq": 0,
+          "maxpwr": 0,
+          "ledma": 55,
+          "drv": 0,
+          "text": ""
+        },
+        {
+          "start": 192,
           "len": 1,
           "pin": [
             48
