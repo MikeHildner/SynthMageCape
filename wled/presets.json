@@ -503,5 +503,21 @@
       }
     ],
     "n": "Sound test"
+  },
+  "10": {
+    "on": "t",
+    "n": "Power toggle"
+  },
+  "11": {
+    "ps": "1~2~",
+    "n": "Next look"
+  },
+  "12": {
+    "bri": "~32",
+    "n": "Brighter"
+  },
+  "13": {
+    "bri": "~-16",
+    "n": "Dimmer"
   }
 }
