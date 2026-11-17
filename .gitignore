@@ -21,3 +21,6 @@ Thumbs.db
 
 # PlatformIO build output
 .pio/
+
+# Full flash images of boards. They contain the Wi-Fi password: never commit.
+backups/
