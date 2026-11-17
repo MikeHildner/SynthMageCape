@@ -67,10 +67,29 @@ void setRow(uint8_t row, const CRGB& colour) {
   lapelTwo[LEDS_PER_LAPEL - 1 - row] = colour;
 }
 
-// level 0..1 to the warm white the note light used in step 3.
-CRGB warm(float level) {
+// ---- colour, and pitch bend
+//
+// Hue is a position on FastLED's colour wheel, 0-255: 0 red, 32 orange,
+// 64 yellow, 96 green, 128 aqua, 160 blue, 192 purple, 224 pink.
+// At rest everything is a warm white. Pitch bend turns the wheel for everything
+// that is lit: fully right reaches aqua by way of yellow and green, fully left
+// reaches purple by way of red and pink. The joystick springs back, and so
+// does the colour.
+const uint8_t BASE_HUE = 36;          // warm orange...
+const uint8_t BASE_SATURATION = 170;  // ...with enough white in it to read as warm white
+const float BEND_HUE_RANGE = 96;      // how far full bend turns the wheel, either way
+const float COLOUR_GAIN = 1.42f;      // brings the resting colour up to full scale
+
+uint8_t hueNow = BASE_HUE;
+
+// level 0..1 to a colour at the current hue.
+CRGB colourAt(float level) {
+  if (level <= 0) return CRGB::Black;
   if (level > 1) level = 1;
-  return CRGB((uint8_t)(255 * level), (uint8_t)(150 * level), (uint8_t)(50 * level));
+  const CRGB full = CHSV(hueNow, BASE_SATURATION, 255);
+  const float gain = level * COLOUR_GAIN;
+  return CRGB((uint8_t)min(255.0f, full.r * gain), (uint8_t)min(255.0f, full.g * gain),
+              (uint8_t)min(255.0f, full.b * gain));
 }
 
 void drawNotes(uint32_t now) {
@@ -120,7 +139,7 @@ void drawNotes(uint32_t now) {
     if (level[row] < glow) level[row] = glow;
   }
 
-  for (uint8_t row = 0; row < ROWS; row++) setRow(row, warm(level[row]));
+  for (uint8_t row = 0; row < ROWS; row++) setRow(row, colourAt(level[row]));
 }
 
 }  // namespace
@@ -176,9 +195,15 @@ void capePedal(uint8_t value) {
   pedalDown = down;
 }
 
+void capeBend(int bend) {
+  // bend is -8192..8191; uint8_t arithmetic wraps round the colour wheel.
+  hueNow = (uint8_t)(BASE_HUE + (int)lroundf(bend * BEND_HUE_RANGE / 8192.0f));
+}
+
 void capeBlank() { FastLED.clear(true); }
 
 void capeAllNotesOff() {
+  hueNow = BASE_HUE;
   memset(heldVelocity, 0, sizeof(heldVelocity));
   memset(sustainLevel, 0, sizeof(sustainLevel));
   pedalDown = false;

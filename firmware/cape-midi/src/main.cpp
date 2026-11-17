@@ -302,6 +302,8 @@ void loop() {
       capeNoteOff(message.data1);
     } else if (message.type() == 0xB0 && message.data1 == 64) {  // sustain pedal
       capePedal(message.data2);
+    } else if (message.type() == 0xE0) {  // pitch bend: 14 bits, centred on 8192
+      capeBend(((message.data2 << 7) | message.data1) - 8192);
     }
     printMessage(message);
   }

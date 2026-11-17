@@ -38,6 +38,10 @@ void capeAllNotesOff();
 // keys keep their glow; pressing further brightens them; lifting lets them go.
 void capePedal(uint8_t value);
 
+// Pitch bend moved (-8192 to 8191, 0 at rest). It turns the colour of
+// everything that is lit: right towards aqua, left towards purple.
+void capeBend(int bend);
+
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.
 void capeShow(LinkState state);
 
