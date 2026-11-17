@@ -261,8 +261,7 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   say("\n");
-  say("Synth Mage cape, MIDI firmware. Built " BUILD_STAMP "
-");
+  say("Synth Mage cape, MIDI firmware. Built %s\n", BUILD_STAMP);
 
   capeBegin();
   runParserSelfTest();
