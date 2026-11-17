@@ -92,8 +92,54 @@ CRGB colourAt(float level) {
               (uint8_t)min(255.0f, full.b * gain));
 }
 
+// ---- sparkle
+//
+// The bigger the chord, the more the lapels shimmer: single LEDs anywhere on
+// either lapel flash briefly, paler than the note colour. Counted are the keys
+// held down plus the notes the pedal is holding.
+const uint8_t SPARKLE_FROM_NOTES = 3;      // no sparkle below this many notes
+const uint8_t SPARKLE_FULL_AT_NOTES = 8;   // this many or more gives the full rate
+const float SPARKLES_PER_SECOND = 30;      // the full rate, across both lapels
+const float SPARKLE_FADE_MS = 150;         // a sparkle falls to about a third in this time
+const uint8_t SPARKLE_SATURATION = 70;     // low = nearly white
+
+float sparkle[2][LEDS_PER_LAPEL];  // 0..1, per LED, per lapel
+
+void drawSparkle(uint8_t notesSounding, float elapsedMs) {
+  // New sparkles for this frame. The fractional part becomes a probability.
+  float rate = 0;
+  if (notesSounding >= SPARKLE_FROM_NOTES) {
+    const float span = SPARKLE_FULL_AT_NOTES - SPARKLE_FROM_NOTES + 1;
+    rate = SPARKLES_PER_SECOND * min(1.0f, (notesSounding - SPARKLE_FROM_NOTES + 1) / span);
+  }
+  float due = rate * elapsedMs / 1000.0f;
+  while (due > 0) {
+    if (due >= 1 || random8() < (uint8_t)(due * 255)) {
+      sparkle[random8(2)][random8(LEDS_PER_LAPEL)] = 0.5f + random8() / 510.0f;  // 0.5 to 1
+    }
+    due -= 1;
+  }
+
+  // Fade the old ones and add them on top of what is already drawn.
+  const float keep = expf(-elapsedMs / SPARKLE_FADE_MS);
+  CRGB* const lapels[2] = {lapelOne, lapelTwo};
+  for (uint8_t lapel = 0; lapel < 2; lapel++) {
+    for (uint8_t i = 0; i < LEDS_PER_LAPEL; i++) {
+      float& level = sparkle[lapel][i];
+      if (level == 0) continue;
+      level *= keep;
+      if (level < 0.02f) {
+        level = 0;
+        continue;
+      }
+      lapels[lapel][i] += CHSV(hueNow, SPARKLE_SATURATION, (uint8_t)(255 * level));
+    }
+  }
+}
+
 void drawNotes(uint32_t now) {
   float level[ROWS] = {0};
+  uint8_t notesSounding = 0;
 
   for (Ripple& ripple : ripples) {
     if (!ripple.active) continue;
@@ -116,6 +162,7 @@ void drawNotes(uint32_t now) {
 
   for (uint8_t note = 0; note < 128; note++) {
     if (heldVelocity[note] == 0) continue;
+    notesSounding++;
     const uint8_t row = (uint8_t)(rowOfNote(note) + 0.5f);
     const float glow = HELD_GLOW * heldVelocity[note] / 127.0f;
     if (level[row] < glow) level[row] = glow;
@@ -134,12 +181,15 @@ void drawNotes(uint32_t now) {
       sustainLevel[note] = 0;
       continue;
     }
+    if (pedalDown) notesSounding++;
     const uint8_t row = (uint8_t)(rowOfNote(note) + 0.5f);
     const float glow = sustainLevel[note] * (pedalDown ? pedalDepth : 1.0f);
     if (level[row] < glow) level[row] = glow;
   }
 
   for (uint8_t row = 0; row < ROWS; row++) setRow(row, colourAt(level[row]));
+
+  drawSparkle(notesSounding, elapsed);
 }
 
 }  // namespace
@@ -206,6 +256,7 @@ void capeAllNotesOff() {
   hueNow = BASE_HUE;
   memset(heldVelocity, 0, sizeof(heldVelocity));
   memset(sustainLevel, 0, sizeof(sustainLevel));
+  memset(sparkle, 0, sizeof(sparkle));
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
 }
