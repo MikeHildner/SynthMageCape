@@ -28,17 +28,23 @@ reported from the app's screen. This is the input the cape firmware has to handl
 | Key press | Note On with velocity |
 | Key release | A real Note Off with a release velocity (not Note On with velocity 0) |
 | Sustain pedal | CC 64 with continuous values, not just 0 and 127 (half-damper). Treat 64 and above as down. |
-| Joystick up | CC 1 (mod wheel) |
-| Ribbon | CC 16 |
-| Nothing at all | MIDI clock, continuously, even with the sequencer stopped |
+| Joystick up | CC 1 (mod wheel), 0 to 127, back to 0 on release |
+| Joystick down | CC 2, 0 to 127, back to 0 on release |
+| Joystick left and right | Pitch bend, full range (-8192 to +8191), back to 0 on release |
+| Ribbon | CC 16, 0 to 127; jumps to 64 (centre) when the finger lifts |
+| Changing program | A burst: System Exclusive, bank select (CC 0, CC 32), Program Change, then CC 10, 80, 65 and 67 and more System Exclusive |
+| Nothing at all | MIDI clock, continuously, even with the sequencer stopped; it follows the tempo setting |
 
 - The constant clock means packets arrive all the time (48 ticks a second at
   120 BPM). "Data is arriving" does not mean "someone is playing", and the
   Kronos's tempo is always available.
 - No packet has been flagged as a problem, so the adapter's packets match the
   format described below for everything played so far.
-- Not yet checked: joystick left/right (expected to be pitch bend), joystick
-  down, aftertouch, program changes, and whether active sensing is sent.
+- The joystick, ribbon release, program change and tempo rows were added on
+  17 Nov 2026 from the cape firmware's serial monitor (`firmware/cape-midi`),
+  which uses a C++ port of this app's parser. That session also had no packet
+  flagged as a problem.
+- Not yet checked: aftertouch, and whether active sensing is sent.
 
 ## Requirements
 

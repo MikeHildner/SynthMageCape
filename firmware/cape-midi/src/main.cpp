@@ -1,13 +1,16 @@
-// Step 2 of the MIDI firmware: listen to the Kronos.
+// Step 3 of the MIDI firmware: first light.
 //
 // The board scans for a Bluetooth MIDI device (the CME WIDI Master in the
 // Kronos MIDI OUT), connects, and prints what is played to the serial port
-// (the COM socket, 115200 baud). No cape LEDs yet.
+// (the COM socket, 115200 baud). No cape LEDs yet: the board's own LED answers
+// the keys, so it can sit beside the keyboard on any USB power.
 //
-// The board's own LED shows the state, dimly:
+// The board's own LED, dimly:
 //     blinking blue   scanning
 //     steady blue     connecting
-//     steady green    connected
+//     faint green     connected, nothing played
+//     warm flash      a key was struck; brighter the harder it was struck
+//     low warm glow   keys are being held
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
@@ -47,20 +50,71 @@ void setLed(uint8_t r, uint8_t g, uint8_t b) {
   const uint32_t packed = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
   if (packed == last) return;
   last = packed;
-  rgbLedWrite(ONBOARD_LED_PIN, r * MAX_BRIGHTNESS / 255, g * MAX_BRIGHTNESS / 255, b * MAX_BRIGHTNESS / 255);
+  // Rounded up, so the faintest intent still lights the LED at level 1.
+  rgbLedWrite(ONBOARD_LED_PIN, (r * MAX_BRIGHTNESS + 254) / 255, (g * MAX_BRIGHTNESS + 254) / 255,
+              (b * MAX_BRIGHTNESS + 254) / 255);
 }
 
-void showState() {
+// ---------------------------------------------------------------- note light
+
+bool keyDown[128];
+uint8_t keysDown = 0;
+float flashLevel = 0;  // 0..1: set by a Note On to how hard the key was struck, then fades
+float glowLevel = 0;   // 0..1: stays up while any key is held
+
+const float FLASH_FADE_MS = 180;  // the flash falls to about a third in this time
+const float HELD_GLOW = 0.30f;    // held keys glow at this fraction of the strike
+
+void releaseAllKeys() {
+  memset(keyDown, 0, sizeof(keyDown));
+  keysDown = 0;
+  flashLevel = 0;
+  glowLevel = 0;
+}
+
+// Updates the note light from one MIDI message. Runs in loop().
+void noteLight(const MidiMessage& m) {
+  const uint8_t note = m.data1 & 0x7F;
+  if (m.type() == 0x90 && m.data2 > 0) {
+    if (!keyDown[note]) {
+      keyDown[note] = true;
+      keysDown++;
+    }
+    flashLevel = m.data2 / 127.0f;
+    glowLevel = HELD_GLOW * flashLevel;
+  } else if (m.type() == 0x80 || m.type() == 0x90) {  // Note Off, or Note On with velocity 0
+    if (keyDown[note]) {
+      keyDown[note] = false;
+      keysDown--;
+    }
+    if (keysDown == 0) glowLevel = 0;
+  }
+}
+
+void showLight() {
+  static uint32_t lastFadeMs = 0;
+  const uint32_t now = millis();
+  if (now != lastFadeMs) {
+    flashLevel *= expf(-(float)(now - lastFadeMs) / FLASH_FADE_MS);
+    lastFadeMs = now;
+  }
+
   switch (linkState) {
     case LinkState::Scanning:
       if ((millis() / 500) % 2) setLed(0, 0, 255); else setLed(0, 0, 0);
-      break;
+      return;
     case LinkState::Connecting:
       setLed(0, 0, 255);
-      break;
+      return;
     case LinkState::Connected:
-      setLed(0, 255, 0);
       break;
+  }
+
+  const float level = max(flashLevel, glowLevel);
+  if (level < 0.02f) {
+    setLed(0, 16, 0);  // faint green: connected, nothing played
+  } else {
+    setLed((uint8_t)(255 * level), (uint8_t)(150 * level), (uint8_t)(50 * level));  // warm white
   }
 }
 
@@ -276,7 +330,7 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.println();
-  Serial.println("Synth Mage cape, MIDI firmware, step 2: listen to the Kronos");
+  Serial.println("Synth Mage cape, MIDI firmware, step 3: first light");
 
   runParserSelfTest();
 
@@ -297,7 +351,7 @@ void loop() {
   if (connectRequested) {
     connectRequested = false;
     linkState = LinkState::Connecting;
-    showState();
+    showLight();
     if (connectToMidiDevice()) {
       linkState = LinkState::Connected;
     } else {
@@ -307,8 +361,11 @@ void loop() {
 
   MidiMessage message;
   while (xQueueReceive(midiQueue, &message, 0) == pdTRUE) {
+    noteLight(message);  // light first, so printing never delays it
     printMessage(message);
   }
+  // A dropped connection can swallow Note Offs; do not leave keys stuck down.
+  if (linkState != LinkState::Connected && keysDown > 0) releaseAllKeys();
 
   static uint32_t reportedDrops = 0;
   if (droppedMessages != reportedDrops) {
@@ -317,6 +374,6 @@ void loop() {
   }
 
   reportTempo();
-  showState();
+  showLight();
   delay(2);
 }
