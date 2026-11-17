@@ -37,6 +37,19 @@ Ripple ripples[16];
 
 uint8_t heldVelocity[128];  // 0 = key up
 
+// ---- the sustain pedal
+//
+// Like a piano's dampers: a key released while the pedal is down keeps its
+// glow. How far down the pedal is sets how bright those glows are, they dim
+// slowly while the pedal stays down, and they fall away when it comes up.
+const uint8_t PEDAL_DOWN_AT = 64;         // controller 64 at or above this counts as down
+const float PEDAL_HOLD_FADE_MS = 8000;    // pedal down: glows fall to about a third in this time
+const float PEDAL_RELEASE_FADE_MS = 250;  // pedal up: glows fall away this fast
+
+float sustainLevel[128];  // 0..1 glow of a note the pedal is holding; 0 = none
+bool pedalDown = false;
+float pedalDepth = 0;     // 0.5 (just down) to 1 (fully down)
+
 uint32_t connectedAtMs = 0;
 LinkState lastState = LinkState::Scanning;
 
@@ -89,6 +102,24 @@ void drawNotes(uint32_t now) {
     if (level[row] < glow) level[row] = glow;
   }
 
+  // Notes the pedal is holding. They fade slowly while it is down and quickly
+  // once it is up.
+  static uint32_t lastDrawMs = now;
+  const float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+  const float keep = expf(-elapsed / (pedalDown ? PEDAL_HOLD_FADE_MS : PEDAL_RELEASE_FADE_MS));
+  for (uint8_t note = 0; note < 128; note++) {
+    if (sustainLevel[note] == 0) continue;
+    sustainLevel[note] *= keep;
+    if (sustainLevel[note] < 0.01f) {
+      sustainLevel[note] = 0;
+      continue;
+    }
+    const uint8_t row = (uint8_t)(rowOfNote(note) + 0.5f);
+    const float glow = sustainLevel[note] * (pedalDown ? pedalDepth : 1.0f);
+    if (level[row] < glow) level[row] = glow;
+  }
+
   for (uint8_t row = 0; row < ROWS; row++) setRow(row, warm(level[row]));
 }
 
@@ -107,6 +138,7 @@ void capeBegin() {
 void capeNoteOn(uint8_t note, uint8_t velocity) {
   note &= 0x7F;
   heldVelocity[note] = velocity;
+  sustainLevel[note] = 0;  // struck again: the key's own glow takes over
 
   // Reuse a finished ripple, or failing that the oldest one.
   Ripple* slot = &ripples[0];
@@ -123,12 +155,33 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
   slot->startMs = millis();
 }
 
-void capeNoteOff(uint8_t note) { heldVelocity[note & 0x7F] = 0; }
+void capeNoteOff(uint8_t note) {
+  note &= 0x7F;
+  // Key up with the pedal down: the pedal takes over the glow.
+  if (pedalDown && heldVelocity[note] > 0) {
+    sustainLevel[note] = HELD_GLOW * heldVelocity[note] / 127.0f;
+  }
+  heldVelocity[note] = 0;
+}
+
+void capePedal(uint8_t value) {
+  const bool down = value >= PEDAL_DOWN_AT;
+  if (down) {
+    // Half-pedalling: 64 gives half brightness, 127 gives full.
+    pedalDepth = 0.5f + 0.5f * (float)(value - PEDAL_DOWN_AT) / (127 - PEDAL_DOWN_AT);
+  } else if (pedalDown) {
+    // Coming up: the glows start from the brightness they were showing.
+    for (float& glow : sustainLevel) glow *= pedalDepth;
+  }
+  pedalDown = down;
+}
 
 void capeBlank() { FastLED.clear(true); }
 
 void capeAllNotesOff() {
   memset(heldVelocity, 0, sizeof(heldVelocity));
+  memset(sustainLevel, 0, sizeof(sustainLevel));
+  pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
 }
 

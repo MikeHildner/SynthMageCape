@@ -34,6 +34,10 @@ void capeNoteOn(uint8_t note, uint8_t velocity);
 void capeNoteOff(uint8_t note);
 void capeAllNotesOff();
 
+// The sustain pedal moved (controller 64, 0-127). While it is down, released
+// keys keep their glow; pressing further brightens them; lifting lets them go.
+void capePedal(uint8_t value);
+
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.
 void capeShow(LinkState state);
 

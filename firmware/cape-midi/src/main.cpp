@@ -13,7 +13,8 @@
 //     one green sweep upward    connected
 //     warm ripple from a row    a key was struck: the row is the pitch, the
 //                               brightness is how hard it was struck
-//     low warm glow on a row    that key is being held
+//     low warm glow on a row    that key is being held, or was released with
+//                               the sustain pedal down (deeper pedal, brighter)
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
@@ -299,6 +300,8 @@ void loop() {
       capeNoteOn(message.data1, message.data2);
     } else if (message.type() == 0x80 || message.type() == 0x90) {  // Note Off, or Note On with velocity 0
       capeNoteOff(message.data1);
+    } else if (message.type() == 0xB0 && message.data1 == 64) {  // sustain pedal
+      capePedal(message.data2);
     }
     printMessage(message);
   }
