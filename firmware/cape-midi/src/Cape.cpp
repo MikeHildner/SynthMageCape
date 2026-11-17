@@ -16,6 +16,28 @@ CRGB lapelOne[LEDS_PER_LAPEL];
 CRGB lapelTwo[LEDS_PER_LAPEL];
 CRGB onboard[1];
 
+// ---- bullet string bench test (temporary)
+//
+// One whole, uncut string of 50 on output 3, to learn three things before
+// anything is cut: that every pixel works, which way the data runs, and the
+// colour order. It always shows the same picture, whatever is being played:
+//     pixel 1 red, pixel 2 green, pixel 3 blue   (if not, the colour order is wrong)
+//     the last pixel dim white                   (so the count is right)
+//     one dim white dot walking from pixel 4 towards the far end
+const uint8_t STRING_ONE_PIN = 6;  // output 3 on the shifter board
+const uint8_t STRING_TEST_PIXELS = 50;
+CRGB stringOne[STRING_TEST_PIXELS];
+
+void drawStringTest(uint32_t now) {
+  fill_solid(stringOne, STRING_TEST_PIXELS, CRGB::Black);
+  stringOne[0] = CRGB(255, 0, 0);
+  stringOne[1] = CRGB(0, 255, 0);
+  stringOne[2] = CRGB(0, 0, 255);
+  stringOne[STRING_TEST_PIXELS - 1] = CRGB(90, 90, 90);
+  const uint8_t walkers = STRING_TEST_PIXELS - 4;  // pixels 4 to 49
+  stringOne[3 + (now / 120) % walkers] = CRGB(140, 140, 140);
+}
+
 const uint32_t FRAME_MS = 10;  // 100 frames a second
 
 // ---- ripples
@@ -198,6 +220,9 @@ void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, ONBOARD_LED_PIN, GRB>(onboard, 1);
+  // Bullet pixels use the WS2811 chip, and most strings take colours as
+  // red, green, blue (the strips take green, red, blue). The test shows if not.
+  FastLED.addLeds<WS2811, STRING_ONE_PIN, RGB>(stringOne, STRING_TEST_PIXELS);
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -292,5 +317,6 @@ void capeShow(LinkState state) {
     }
   }
 
+  drawStringTest(now);
   FastLED.show();
 }
