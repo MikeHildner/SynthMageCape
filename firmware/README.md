@@ -14,8 +14,10 @@ From the repository root, in PowerShell or a command prompt:
     tools\pio run -t upload     # build and flash the board on USB
     tools\pio device monitor    # show what the board prints (Ctrl+C to stop)
 
-Plug the board straight into the computer by its UART socket. It shows up as a
-CH343 serial port.
+Plug the board straight into the computer by the socket labelled **COM** (the
+other one is labelled USB). COM goes through the board's serial chip, a CH343,
+and shows up as a serial port. Earlier notes call it the UART socket; it is the
+same one.
 
 Versions are pinned in `cape-midi/platformio.ini`: platform espressif32 8.0.0,
 which brings Arduino-ESP32 core 3.3.x. PlatformIO keeps the compiler and
