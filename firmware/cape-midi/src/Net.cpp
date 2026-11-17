@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <stdarg.h>
 
+#include "BuildStamp.h"
 #include "Cape.h"
 #include "secrets.h"
 
@@ -32,13 +33,13 @@ void handleStatus() {
   char page[400];
   snprintf(page, sizeof(page),
            "Synth Mage cape, MIDI firmware\n"
-           "built        %s %s\n"
+           "built        %s\n"
            "running for  %lu s\n"
            "bluetooth    %s\n"
            "wifi signal  %d dBm\n"
            "free memory  %lu bytes\n"
            "brightness   ceiling %u of 255\n",
-           __DATE__, __TIME__, (unsigned long)(millis() / 1000), linkStatusText(), WiFi.RSSI(),
+           BUILD_STAMP, (unsigned long)(millis() / 1000), linkStatusText(), WiFi.RSSI(),
            (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS);
   server.send(200, "text/plain", page);
 }
