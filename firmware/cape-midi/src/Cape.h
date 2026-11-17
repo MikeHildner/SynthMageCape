@@ -3,7 +3,9 @@
 // Wiring, the same as the WLED setup, so no lead has to move:
 //     GPIO 4   lapel one (96 LEDs)
 //     GPIO 5   lapel two (96 LEDs)
-//     GPIO 48  the LED on the ESP32 board itself
+//     GPIO 6   output 3: bullet string (for now, a bench test pattern)
+//     GPIO 7   output 4: bullet string (the same test pattern)
+// The LED on the ESP32 board itself is not driven: all four LED outputs are in use.
 //
 // Each lapel is one chain of 96: strip one runs up from the plug at the hem to
 // the collar (LEDs 0-47), a U-turn, then strip two runs back down (48-95).

@@ -7,24 +7,27 @@ namespace {
 
 const uint8_t LAPEL_ONE_PIN = 4;
 const uint8_t LAPEL_TWO_PIN = 5;
-const uint8_t ONBOARD_LED_PIN = 48;
+// The LED on the ESP32 board itself (GPIO 48) is no longer driven. The chip
+// has four LED outputs, and the cape needs all four: two lapels, two strings.
+// The hem row of the lapels shows the link state instead.
 
 const uint8_t ROWS = 48;
 const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 
 CRGB lapelOne[LEDS_PER_LAPEL];
 CRGB lapelTwo[LEDS_PER_LAPEL];
-CRGB onboard[1];
 
 // ---- bullet string bench test (temporary)
 //
-// One whole, uncut string of 50 on output 3, to learn three things before
-// anything is cut: that every pixel works, which way the data runs, and the
-// colour order. It always shows the same picture, whatever is being played:
+// One whole, uncut string of 50, to learn three things before anything is
+// cut: that every pixel works, which way the data runs, and the colour order.
+// The same picture goes out on outputs 3 and 4, so either free pigtail on the
+// box will do. It is always the same, whatever is being played:
 //     pixel 1 red, pixel 2 green, pixel 3 blue   (if not, the colour order is wrong)
 //     the last pixel dim white                   (so the count is right)
 //     one dim white dot walking from pixel 4 towards the far end
 const uint8_t STRING_ONE_PIN = 6;  // output 3 on the shifter board
+const uint8_t STRING_TWO_PIN = 7;  // output 4
 const uint8_t STRING_TEST_PIXELS = 50;
 CRGB stringOne[STRING_TEST_PIXELS];
 
@@ -219,10 +222,10 @@ void drawNotes(uint32_t now) {
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
-  FastLED.addLeds<WS2812B, ONBOARD_LED_PIN, GRB>(onboard, 1);
   // Bullet pixels use the WS2811 chip, and most strings take colours as
   // red, green, blue (the strips take green, red, blue). The test shows if not.
   FastLED.addLeds<WS2811, STRING_ONE_PIN, RGB>(stringOne, STRING_TEST_PIXELS);
+  FastLED.addLeds<WS2811, STRING_TWO_PIN, RGB>(stringOne, STRING_TEST_PIXELS);  // same picture
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -296,16 +299,14 @@ void capeShow(LinkState state) {
   lastState = state;
 
   if (state != LinkState::Connected) {
-    // Not connected: the hem row and the board's LED blink blue while
-    // searching and hold steady while connecting. Everything else is dark.
+    // Not connected: the hem row blinks blue while searching and holds
+    // steady while connecting. Everything else is dark.
     const bool lit = state == LinkState::Connecting || (now / 500) % 2;
     fill_solid(lapelOne, LEDS_PER_LAPEL, CRGB::Black);
     fill_solid(lapelTwo, LEDS_PER_LAPEL, CRGB::Black);
     setRow(0, lit ? CRGB(0, 0, 120) : CRGB::Black);
-    onboard[0] = lit ? CRGB(0, 0, 120) : CRGB::Black;
   } else {
     drawNotes(now);
-    onboard[0] = CRGB(0, 40, 0);  // faint green: connected
 
     // Just connected: one soft green wavefront climbs the lapels, so the
     // wearer can see the link is up without looking at the box.
