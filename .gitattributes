@@ -1,0 +1,3 @@
+# Git guesses "text" for a PDF that happens to contain no zero bytes, and would
+# then rewrite its line endings on checkout, which damages the file.
+*.pdf binary
