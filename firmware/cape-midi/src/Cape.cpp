@@ -125,6 +125,8 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
 
 void capeNoteOff(uint8_t note) { heldVelocity[note & 0x7F] = 0; }
 
+void capeBlank() { FastLED.clear(true); }
+
 void capeAllNotesOff() {
   memset(heldVelocity, 0, sizeof(heldVelocity));
   for (Ripple& ripple : ripples) ripple.active = false;

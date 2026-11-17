@@ -3,7 +3,9 @@
 // The board scans for a Bluetooth MIDI device (the CME WIDI Master in the
 // Kronos MIDI OUT), connects, and turns what is played into light on the
 // cape's two lapels (see Cape.h). It also prints every message to the serial
-// port (the COM socket, 115200 baud).
+// port (the COM socket, 115200 baud) and keeps the latest for the log page.
+//
+// At home it also joins Wi-Fi, for updates and the log (see Net.h).
 //
 // What the lights mean:
 //     hem row blinking blue     searching for the WIDI Master
@@ -16,7 +18,9 @@
 #include <NimBLEDevice.h>
 
 #include "BleMidiParser.h"
+#include "BuildStamp.h"
 #include "Cape.h"
+#include "Net.h"
 #include "ParserSelfTest.h"
 
 // The one service and one characteristic that make up Bluetooth MIDI.
@@ -55,9 +59,9 @@ void onMidiMessage(const MidiMessage& message, void*) {
 void onMidiPacket(NimBLERemoteCharacteristic*, uint8_t* data, size_t length, bool) {
   const uint8_t problems = parser.parse(data, length, onMidiMessage, nullptr);
   if (problems > 0) {
-    Serial.printf("  ? packet problem: %s. Bytes:", parser.lastProblem());
-    for (size_t i = 0; i < length; i++) Serial.printf(" %02X", data[i]);
-    Serial.println();
+    say("  ? packet problem: %s. Bytes:", parser.lastProblem());
+    for (size_t i = 0; i < length; i++) say(" %02X", data[i]);
+    say("\n");
   }
 }
 
@@ -71,7 +75,7 @@ void startScan() {
 class ScanCallbacks : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice* device) override {
     if (!device->isAdvertisingService(MIDI_SERVICE)) return;
-    Serial.printf("Found a Bluetooth MIDI device: \"%s\"  address %s  signal %d dBm\n",
+    say("Found a Bluetooth MIDI device: \"%s\"  address %s  signal %d dBm\n",
                   device->getName().c_str(), device->getAddress().toString().c_str(), device->getRSSI());
     NimBLEDevice::getScan()->stop();
     foundDevice = device;
@@ -86,7 +90,7 @@ class ScanCallbacks : public NimBLEScanCallbacks {
 
 class ClientCallbacks : public NimBLEClientCallbacks {
   void onDisconnect(NimBLEClient*, int reason) override {
-    Serial.printf("Disconnected (reason %d). Scanning again.\n", reason);
+    say("Disconnected (reason %d). Scanning again.\n", reason);
     parser.reset();
     startScan();
   }
@@ -97,7 +101,7 @@ bool connectToMidiDevice() {
   NimBLEClient* client = NimBLEDevice::getDisconnectedClient();
   if (client == nullptr) client = NimBLEDevice::createClient();
   if (client == nullptr) {
-    Serial.println("Could not create a Bluetooth client.");
+    say("Could not create a Bluetooth client.\n");
     return false;
   }
   client->setClientCallbacks(&clientCallbacks, false);
@@ -107,14 +111,14 @@ bool connectToMidiDevice() {
   client->setConnectTimeout(5000);
 
   if (!client->connect(foundDevice)) {
-    Serial.println("Connect failed.");
+    say("Connect failed.\n");
     return false;
   }
 
   NimBLERemoteService* service = client->getService(MIDI_SERVICE);
   NimBLERemoteCharacteristic* midi = service ? service->getCharacteristic(MIDI_CHARACTERISTIC) : nullptr;
   if (midi == nullptr) {
-    Serial.println("Connected, but the MIDI service or characteristic is missing.");
+    say("Connected, but the MIDI service or characteristic is missing.\n");
     client->disconnect();
     return false;
   }
@@ -123,12 +127,12 @@ bool connectToMidiDevice() {
   if (midi->canRead()) midi->readValue();
 
   if (!midi->canNotify() || !midi->subscribe(true, onMidiPacket)) {
-    Serial.println("Connected, but could not subscribe to MIDI notifications.");
+    say("Connected, but could not subscribe to MIDI notifications.\n");
     client->disconnect();
     return false;
   }
 
-  Serial.printf("Connected and listening. Connection interval %.2f ms.\n", client->getConnInfo().getConnInterval() * 1.25);
+  say("Connected and listening. Connection interval %.2f ms.\n", client->getConnInfo().getConnInterval() * 1.25);
   return true;
 }
 
@@ -157,45 +161,45 @@ void printMessage(const MidiMessage& m) {
     case 0x90:
       if (m.data2 > 0) {
         noteName(m.data1, name, sizeof(name));
-        Serial.printf("Note On   %-4s (%3u)  velocity %3u  ch %u\n", name, m.data1, m.data2, m.channel() + 1);
+        say("Note On   %-4s (%3u)  velocity %3u  ch %u\n", name, m.data1, m.data2, m.channel() + 1);
         break;
       }
       // Note On with velocity 0 means Note Off.
       [[fallthrough]];
     case 0x80:
       noteName(m.data1, name, sizeof(name));
-      Serial.printf("Note Off  %-4s (%3u)\n", name, m.data1);
+      say("Note Off  %-4s (%3u)\n", name, m.data1);
       break;
     case 0xA0:
-      Serial.printf("Key pressure   note %u  value %u\n", m.data1, m.data2);
+      say("Key pressure   note %u  value %u\n", m.data1, m.data2);
       break;
     case 0xB0:
-      Serial.printf("Control %3u%s  value %3u\n", m.data1, controllerName(m.data1), m.data2);
+      say("Control %3u%s  value %3u\n", m.data1, controllerName(m.data1), m.data2);
       break;
     case 0xC0:
-      Serial.printf("Program change %u\n", m.data1);
+      say("Program change %u\n", m.data1);
       break;
     case 0xD0:
-      Serial.printf("Channel pressure %u\n", m.data1);
+      say("Channel pressure %u\n", m.data1);
       break;
     case 0xE0:
       // 14 bits, least significant first, centred on zero.
-      Serial.printf("Pitch bend %+d\n", ((m.data2 << 7) | m.data1) - 8192);
+      say("Pitch bend %+d\n", ((m.data2 << 7) | m.data1) - 8192);
       break;
     case 0xF0:
-      Serial.println("System Exclusive (contents skipped)");
+      say("System Exclusive (contents skipped)\n");
       break;
     case 0xFA:
-      Serial.println("Start");
+      say("Start\n");
       break;
     case 0xFB:
-      Serial.println("Continue");
+      say("Continue\n");
       break;
     case 0xFC:
-      Serial.println("Stop");
+      say("Stop\n");
       break;
     default:
-      Serial.printf("Other message: status %02X  data %u %u\n", m.status, m.data1, m.data2);
+      say("Other message: status %02X  data %u %u\n", m.status, m.data1, m.data2);
       break;
   }
 }
@@ -237,22 +241,32 @@ void reportTempo() {
     return;
   }
   if (abs(bpm - lastBpm) >= 3) {
-    if (bpm == 0) Serial.println("No MIDI clock arriving.");
-    else Serial.printf("MIDI clock: about %d BPM\n", bpm);
+    if (bpm == 0) say("No MIDI clock arriving.\n");
+    else say("MIDI clock: about %d BPM\n", bpm);
     lastBpm = bpm;
   }
 }
 
 // ---------------------------------------------------------------- main
 
+const char* linkStatusText() {
+  switch (linkState) {
+    case LinkState::Scanning: return "searching for the WIDI Master";
+    case LinkState::Connecting: return "connecting";
+    default: return "connected, listening to the Kronos";
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(300);
-  Serial.println();
-  Serial.println("Synth Mage cape, MIDI firmware, step 4: the lapels");
+  say("\n");
+  say("Synth Mage cape, MIDI firmware. Built " BUILD_STAMP "
+");
 
   capeBegin();
   runParserSelfTest();
+  netBegin();
 
   midiQueue = xQueueCreate(64, sizeof(MidiMessage));
 
@@ -263,7 +277,7 @@ void setup() {
   scan->setWindow(100);
   scan->setActiveScan(true);
 
-  Serial.println("Scanning for a Bluetooth MIDI device...");
+  say("Scanning for a Bluetooth MIDI device...\n");
   startScan();
 }
 
@@ -295,10 +309,11 @@ void loop() {
   static uint32_t reportedDrops = 0;
   if (droppedMessages != reportedDrops) {
     reportedDrops = droppedMessages;
-    Serial.printf("  ! %lu messages dropped so far (queue full)\n", (unsigned long)reportedDrops);
+    say("  ! %lu messages dropped so far (queue full)\n", (unsigned long)reportedDrops);
   }
 
   reportTempo();
   capeShow(linkState);
+  netLoop();
   delay(1);
 }

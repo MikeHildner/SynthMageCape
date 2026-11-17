@@ -36,3 +36,6 @@ void capeAllNotesOff();
 
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.
 void capeShow(LinkState state);
+
+// All lights out, now.
+void capeBlank();

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "BleMidiParser.h"
+#include "Net.h"
 
 namespace {
 
@@ -120,10 +121,10 @@ bool runParserSelfTest() {
     if (ok) {
       passed++;
     } else {
-      Serial.printf("  FAILED: %s (got %u messages, %u problems)\n", test.name, got.count, problems);
+      say("  FAILED: %s (got %u messages, %u problems)\n", test.name, got.count, problems);
     }
   }
 
-  Serial.printf("Parser self-test: %u of %u passed\n", passed, total);
+  say("Parser self-test: %u of %u passed\n", passed, total);
   return passed == total;
 }

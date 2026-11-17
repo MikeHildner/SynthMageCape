@@ -24,3 +24,7 @@ Thumbs.db
 
 # Full flash images of boards. They contain the Wi-Fi password: never commit.
 backups/
+
+# Wi-Fi password for the cape firmware, and the generated build time
+firmware/cape-midi/include/secrets.h
+firmware/cape-midi/include/BuildStamp.h
