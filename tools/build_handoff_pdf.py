@@ -155,7 +155,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#777777"))
-    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / designer handoff / 20 October 2026")
+    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / revised 17 November 2026")
     canvas.drawRightString(PAGE_W - MARGIN, 0.5 * inch, f"Page {doc.page}")
     canvas.restoreState()
 
@@ -170,13 +170,14 @@ def build():
         "Two concept renders to read alongside the handoff that follows. The lit image shows the look from "
         "the audience at the keyboard. The unlit image is the construction reference: the lighter charcoal "
         "strips mark where the mesh-faced channels go. Both are AI concept renders, not patterns; the "
-        "written dimensions in the handoff take precedence wherever they disagree with a picture.",
+        "written handoff takes precedence wherever it disagrees with a picture. In particular, the dots of "
+        "light below the lapels are an open question (section 4 of the handoff), not a settled design.",
         BODY))
     story.append(Spacer(1, 10))
 
     col_w = (CONTENT_W - 0.3 * inch) / 2
     img_h = 6.6 * inch
-    left = [fitted_image(IMG_ON, col_w, img_h), Paragraph("Lights on, from the audience. Collar outline, two-row lapel bars, shoulder segments, dotted lower edges.", CAPTION)]
+    left = [fitted_image(IMG_ON, col_w, img_h), Paragraph("Lights on, from the audience. Collar outline, two-row lapel bars, shoulder segments, and the dotted lower lines that section 4 asks about.", CAPTION)]
     right = [fitted_image(IMG_OFF, col_w, img_h), Paragraph("Lights off, zone map. Charcoal strips show every channel: collar edges and rim, full-length front channels, shoulders, outer side seams. Nothing in the bottom 15 cm.", CAPTION)]
     t = Table([[left, right]], colWidths=[col_w, col_w], hAlign="CENTER")
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
