@@ -43,7 +43,7 @@ uint8_t heldVelocity[128];  // 0 = key up
 // glow. How far down the pedal is sets how bright those glows are, they dim
 // slowly while the pedal stays down, and they fall away when it comes up.
 const uint8_t PEDAL_DOWN_AT = 64;         // controller 64 at or above this counts as down
-const float PEDAL_HOLD_FADE_MS = 8000;    // pedal down: glows fall to about a third in this time
+const float PEDAL_HOLD_FADE_MS = 4000;    // pedal down: glows fall to about a third in this time
 const float PEDAL_RELEASE_FADE_MS = 250;  // pedal up: glows fall away this fast
 
 float sustainLevel[128];  // 0..1 glow of a note the pedal is holding; 0 = none
