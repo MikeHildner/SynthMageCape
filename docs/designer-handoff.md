@@ -7,7 +7,7 @@ Prepared 18 November 2026 by Mike (electronics and firmware), after the electron
 ## Where things stand
 
 - **Built and working:** the control box, both lapel light pieces, and the wireless link from the keyboard. The lights follow what Mike plays: each key makes a ripple at its own height on the lapel, harder playing is brighter, the pedal holds the glow. Mike can show this on a stand-in cape before you start.
-- **Deliberately not built yet:** the collar light, the shoulder lights, and anything below the lapels. These depend on the real garment, so they wait for your input.
+- **Deliberately not built yet:** the collar light, the shoulder lights, and the string lights below the lapels. These depend on the real garment, so they wait for your input.
 - **Nothing is fixed that sewing would have to work around.** The lapel pieces can be rebuilt to a different length, and every other piece will be cut to your measurements.
 
 ## How I would like to work with you
@@ -19,18 +19,18 @@ The lights are not all finished, and I do not want you to wait for them. I would
 3. **I pin on the lights and the control box,** try the cape at the keyboard, and adjust until it is right. This is the gap: it may take me a few weeks.
 4. **You finish it around the real hardware:** channels, mesh, the pouch, openings for the cables, and closing everything up.
 
-What can wait until stage 4: the exact length of each light piece, whether anything is lit below the lapels and with what (section 4), the mesh, and the pouch.
+What can wait until stage 4: the exact length of each light piece, how the string lights below the lapels are held in place (section 4), the mesh, and the pouch.
 
 If you would work differently, tell me. You know how a garment goes together and I do not.
 
 ## The short version
 
-- Lit zones: the collar outline, two lapels, two shoulders. Possibly dots of light below the lapels and along an outer line on each side. Nothing lit within 15 cm of the hem.
-- Each front edge gets one mesh-faced channel, about 30 mm wide, for the lapel lights. How far down it continues depends on section 4.
+- Lit zones: the collar outline, two lapels, two shoulders, and strings of small dot lights below the lapels and along an outer line on each side. Nothing lit within 15 cm of the hem.
+- Each front edge gets one mesh-faced channel, about 30 mm wide, for the lapel lights. Whether it continues below the lapel for the dot lights is your call (section 4).
 - Everything electrical is removable. Nothing is sewn in permanently. Cleaning the cape means pulling all of it out first.
-- Plug-in points: one at the bottom of each lapel, near the waist, and one at each shoulder.
+- Plug-in points: one at the bottom of each lapel, near the waist, and one at each shoulder. There is a drawing of the cable routes further down.
 - One pouch on a belt at the hip holds the battery and the control box.
-- The lights go behind a black mesh everywhere, so the cape looks like a plain black cape when they are off.
+- The strip lights go behind a black mesh, so the cape looks like a plain black cape when they are off.
 - Nothing connects Mike to the keyboard. The link is wireless, so the cape has no trailing cable.
 - Before any channels are sewn, we do a plain-fabric mockup and a reach test at the keyboard with foam shoulder pieces.
 
@@ -70,42 +70,51 @@ Not built yet. Mike would like to have these if the reach test allows.
 - Channel: about 14 mm, black mesh face.
 - If the reach test says the epaulets have to go, nothing else is affected.
 
-### 4. Below the lapels: open, and I would like your advice
+[[page-break]]
+
+### 4. Below the lapels: strings of small dot lights
+
+Planned. The strings are ordered and have not been tested yet.
 
 The render shows two more lines of light dots on each side: one continuing down the front edge below the lapel, and an outer line that starts near the waist and angles out towards the hem. (I call it the outer line because I do not know whether your pattern has a seam there; the line in the render is what I mean.)
 
-The brief planned these as strings of sealed "bullet" lights. I have those strings and they work, but they are made for outdoor signs: each light is a resin-sealed plug about 12 mm across and 20 mm long, and forty of them are heavy for fabric that is meant to swing. I would rather not use them.
-
-The option I prefer is the same flexible strip as the lapels, with only some of its lights switched on, so it reads as separate dots. Which lights are on is software, so the spacing of the dots can be changed at any time without touching the garment.
-
-What decides it is how the strip is allowed to bend. It behaves like a tape measure:
-
-- It rolls and curves freely across its flat face.
-- It will not bend edgewise.
-- It must not be folded sharply, and it does not like being twisted over and over.
-
-So strip works on a line that hangs straight or curves gently and never creases, and it does not work where the fabric folds or bunches.
+- **What they are:** a string of tiny lights, each under a small bead of clear resin, about 10 cm apart on three thin wires. A string of 50 is 5 m long and very light. I will weigh one when they arrive.
+- **One string per side.** It plugs in at the bottom of the lapel, runs down the front edge, crosses over to the outer line a little above the hem, and climbs the outer line. The lights in the crossing stay switched off, so it does not show. The drawing in the next section shows the path.
+- **A string can go where the fabric folds and swings.** That is why I chose it for this part of the cape; the strips on the lapels cannot.
+- **The spacing is fixed at 10 cm** by the wire between the lights. A string cannot be stretched. It can be made to look wider-spaced, because which lights are on is software.
+- **Leftover string** is coiled and tucked away inside the lining, or I cut it off once the path is settled.
+- **The hem rule: nothing lit within 15 cm of the hem.** Anything at floor level gets stepped on and kicked.
 
 The questions for you:
 
-- **Lower front edge.** Could the front channel simply continue below the lapel, on a faced edge that hangs straight? If so, the strip continues down the same channel and plugs into the bottom of the lapel, with no extra plug-in point on the garment.
-- **Outer line.** Is there a line in your pattern, a seam or a stiffened edge, that hangs without creasing where a single strip about 12 mm wide could run? If there is not, I am content to leave the outer line out.
-- **If neither suits strip,** the choices are the bullet strings after all (I will bring one so you can feel the weight), a lighter kind of dot light on thin wire that I have not tested yet, or no lights below the lapels at all. The lapels carry the show; the lower lights are a nice extra, not a requirement.
+- **How would you hold a string in place?** A narrow sleeve, thread loops around the wire between the lights, or something better that you know. It has to come out for cleaning, and nothing may be stitched through the wires.
+- **Where should the outer line run on your pattern?**
+- **Mesh or no mesh over the dots?** They are small points of light, not a pale stripe like the strips, so they may not need hiding.
 
-Whatever goes there, the hem rule stays: **nothing lit within 15 cm of the hem.** Anything at floor level gets stepped on and kicked.
+Two things you should know:
 
-## The plug-in points
+- The brief planned these as sealed "bullet" lights. I have dropped those: they are made for outdoor signs and are too heavy for fabric that is meant to swing.
+- If the strings do not survive my bending test, the fallback is no lights below the lapels. The lapels carry the show; the lower lights are an extra, not a requirement. Nothing you sew in stage 2 depends on them.
+
+[[page-break]]
+
+## The plug-in points, and where the cables run
+
+[[wiring-drawing]]
+
+The pouch with the control box and battery is on a belt, worn on the body under the cape. Four cables leave it. The drawing shows the pouch on Mike's right hip; which side is not decided.
 
 | Where | What plugs in | Cable arriving from |
 |---|---|---|
-| Bottom of the left lapel, near the waist | Left lapel, and any lights below it | Pouch at the hip, short run |
-| Bottom of the right lapel, near the waist | Right lapel, and any lights below it | Pouch at the hip, short run |
-| Left shoulder | Left half of the collar, left shoulder strip | Pouch at the hip, up the inside of the left front |
-| Right shoulder | Right half of the collar, right shoulder strip | Pouch at the hip, up the inside of the right front |
+| Bottom of each lapel, near the waist | The lapel. That side's string of dot lights plugs into the lapel at the same place. | The pouch. A short run on the pouch side; around Mike's back along the belt for the other side. |
+| Each shoulder | That side's half of the collar, and its shoulder strip | The pouch, then up inside the lining of the front edge. For the far side, around the back along the belt first. |
 
-The two lapel connections are built. The two shoulder cables are planned, not built, so their route is yours to choose.
+- Getting dressed goes: belt, then cape, then four plugs.
+- The cape is open at the front, so no cable can cross there. The far side is reached behind Mike, along the belt.
+- The two lapel connections are built. The two shoulder cables are planned, not built, so their route is yours to choose.
+- **An alternative for the shoulder cables:** both together up the centre of the back, inside the lining, splitting at the collar. That is one hidden channel to sew in place of two. Either route works for me; tell me which suits your seams.
 
-Each plug is a small locking connector on three thin wires. I will give you a real pair so you can size openings against it. The two cables from the pouch to the shoulders will be about 80 to 90 cm each and want a hidden channel in the lining up the inside of each front edge. Each cable also needs a small loop or tab near the connector that it can be tied to, so a tug on the cape pulls on the fabric and never on the plug.
+Each plug is a small locking connector on three thin wires. I will give you a real pair so you can size openings against it. A cable from the pouch to a shoulder is about 80 to 90 cm of thin three-wire cable and wants a hidden channel in the lining. Each cable also needs a small loop or tab near the connector that it can be tied to, so a tug on the cape pulls on the fabric and never on the plug.
 
 Rules of thumb for everything that plugs or is sewn in:
 
@@ -122,11 +131,11 @@ Rules of thumb for everything that plugs or is sewn in:
 - **Microphone: probably not needed.** The control box can carry a small microphone that listens to the band. It would need the pouch's outer face to stay uncovered, with a mesh window. Now that the lights follow the keyboard directly, Mike doubts the microphone is worth having. Please tell me whether an exposed pouch face is easy or awkward for you. If it is awkward, the microphone goes and the pouch can be completely hidden.
 - **No metal around the pouch.** The control box talks to the keyboard by radio (Bluetooth). Metallic fabric, foil lining, or a metal plate over the pouch would block it. Ordinary fabric, foam, and plastic are fine.
 - Three small buttons and a power switch sit on the pouch flap, on wires about 40 cm long. Mike must be able to reach them without help while wearing the cape. The power switch is the real off switch for everything.
-- Four cables leave the pouch: two short ones to the lapel bottoms, two long ones up to the shoulders.
+- Four cables leave the pouch: two to the lapel bottoms and two up to the shoulders. The pair for the far side goes around Mike's back along the belt.
 
 ## Cleaning and access
 
-- Every strip, cable, and the pouch comes out before cleaning. None of it can be washed, steamed, or dry-cleaned.
+- Every strip, string, cable, and the pouch comes out before cleaning. None of it can be washed, steamed, or dry-cleaned.
 - Channels therefore need an opening at one end with concealed snaps or hook-and-loop, wide enough to slide the strip out. For the lapels, the opening must pass the pair of strips together with their joining loop, or the plug; tell me which end you would rather open.
 - The two hidden cable channels in the lining need an opening at each end.
 - Connectors are marked so Mike can reassemble it without help.
@@ -134,7 +143,7 @@ Rules of thumb for everything that plugs or is sewn in:
 
 ## Mesh over everything
 
-A black diffusion mesh over every lit zone, so with the lights off the cape reads as a plain black cape with the silhouette doing the work, which is the brief's own priority. Where you can, a little stand-off between the lights and the mesh makes the dots blur into a glow.
+A black diffusion mesh over every strip, so with the lights off the cape reads as a plain black cape with the silhouette doing the work, which is the brief's own priority. Where you can, a little stand-off between the lights and the mesh makes the dots blur into a glow.
 
 **Please do not buy mesh in quantity before we have tested a scrap.** The lights run deliberately dim: this is a costume for a dark stage, and the aim is a glow that does not overwhelm the other players or the audience. At that brightness I do not yet know how much a black mesh takes away, and a dense mesh could swallow the light. The test is simple: hold the scrap over the working lapel in a dark room.
 
@@ -147,11 +156,12 @@ This belongs to stage 1, before the real fabric is cut:
 3. Decide the lapel facing width (50 mm or more preferred) and the lapel length.
 4. Confirm the collar front edges are straight and stiff enough to carry a strip.
 5. Confirm safe hem clearance from the stage floor, per the brief.
-6. Look at where lights below the lapels could run (section 4), so the pattern leaves room for them. The decision itself can wait.
+6. Look at where the string lights below the lapels will run (section 4), the outer line in particular, so the pattern leaves room for them.
+7. Choose the route for the shoulder cables: up each front edge, or together up the centre back.
 
 These can wait until the lights are pinned on (stage 3 or 4):
 
-- Whether anything is lit below the lapels, and with what.
+- How the string lights below the lapels are held in place.
 - Where the pouch sits on the belt, and whether its outer face can show.
 - Mesh samples held over the working lights in a darkened room.
 
@@ -162,7 +172,7 @@ So channels and openings are sized against real objects, not drawings:
 - One working lapel piece, lit, on the stand-in cape, with the control box and power bank.
 - One lapel dummy for sewing around: two dead strips side by side, with the joining loop and the plug.
 - One collar dummy of the thin collar strip, about 55 cm, with the corner join between a front edge and the top rim.
-- One string of the bullet lights, to judge the weight.
+- One string of the dot lights, working if they have arrived and passed their test.
 - One connector pair with 20 cm of cable each side.
 - The weights of the lapel piece, the control box, and the power bank.
 
@@ -171,10 +181,11 @@ The final working lights follow only after they have been cut to your measuremen
 ## Questions, in one place
 
 1. Lapel facing width, and lapel length?
-2. Can the front channel continue below the lapel on an edge that hangs straight?
-3. Is there an outer line that hangs without creasing, where one strip could run?
+2. How would you hold a string of dot lights in place, so it can come out for cleaning?
+3. Where should the outer line run on your pattern?
 4. Shoulder pieces: foam or interfacing, and do they pass the reach test?
 5. Is an exposed pouch face easy or awkward? (Decides the microphone.)
 6. Is a power bank of about 150 mm concealable, or should it be the 100 mm size?
 7. Which mesh, after the dark-room test?
 8. Which channel openings do you prefer, snaps or hook-and-loop, and at which end of the lapel?
+9. Shoulder cables: up each front edge, or together up the centre back?

@@ -3,6 +3,7 @@ import re
 import sys
 from pathlib import Path
 
+from reportlab.graphics.shapes import Circle, Drawing, Group, Line, Polygon, PolyLine, Rect, String
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
@@ -72,6 +73,121 @@ def make_table(rows):
     return t
 
 
+def wiring_drawing():
+    """Front view of the cape: lights, the pouch, the cables and the plug-in points.
+
+    Drawn in the coordinates of the on-screen sketch it was copied from
+    (x 60 to 660, y 14 to 624, y downwards), then scaled to the page width.
+    """
+    SRC_W, SRC_H = 600, 610
+    scale = 0.86 * CONTENT_W / SRC_W  # a little under full width, so the table below it fits on the page
+    drawing = Drawing(SRC_W * scale, SRC_H * scale)
+    drawing.hAlign = "CENTER"
+    g = Group(transform=(scale, 0, 0, scale, 0, 0))
+    drawing.add(g)
+
+    LIGHT = colors.HexColor("#534AB7")
+    CABLE = colors.HexColor("#D85A30")
+    INK = colors.HexColor("#2C2C2A")
+    GREY = colors.HexColor("#888780")
+    PANEL = colors.HexColor("#F1EFE8")
+
+    def X(x):
+        return x - 60
+
+    def Y(y):
+        return SRC_H - (y - 14)
+
+    def pts(*xy):
+        out = []
+        for i in range(0, len(xy), 2):
+            out += [X(xy[i]), Y(xy[i + 1])]
+        return out
+
+    def line(x1, y1, x2, y2, colour, width, dash=None):
+        g.add(Line(X(x1), Y(y1), X(x2), Y(y2), strokeColor=colour, strokeWidth=width,
+                   strokeDashArray=dash, strokeLineCap=1))
+
+    def poly(colour, width, *xy, dash=None):
+        g.add(PolyLine(pts(*xy), strokeColor=colour, strokeWidth=width, strokeDashArray=dash,
+                       strokeLineCap=1, strokeLineJoin=1))
+
+    def dot(x, y, r, colour):
+        g.add(Circle(X(x), Y(y), r, fillColor=colour, strokeColor=None))
+
+    def text(x, y, words, anchor="start", bold=False):
+        g.add(String(X(x), Y(y), words, fontName="Helvetica-Bold" if bold else "Helvetica",
+                     fontSize=12, fillColor=INK, textAnchor=anchor))
+
+    def label(x1, y1, x2, y2, words):
+        line(x1, y1, x2, y2, GREY, 0.5, dash=[3, 3])
+        text(452, y2 + 4, words)
+
+    text(150, 30, "Mike's right", anchor="middle")
+    text(350, 30, "Mike's left", anchor="middle")
+
+    # The two front panels of the open cape, and the belt behind them.
+    g.add(Polygon(pts(225, 100, 150, 120, 80, 520, 225, 520), fillColor=PANEL, strokeColor=GREY, strokeWidth=0.5))
+    g.add(Polygon(pts(275, 100, 350, 120, 420, 520, 275, 520), fillColor=PANEL, strokeColor=GREY, strokeWidth=0.5))
+    line(118, 336, 382, 336, GREY, 0.5)
+
+    # Strip lights: collar halves, shoulders, lapels.
+    poly(LIGHT, 3, 225, 100, 225, 60, 231, 52, 240, 47, 250, 46)
+    poly(LIGHT, 3, 275, 100, 275, 60, 269, 52, 260, 47, 250, 46)
+    line(160, 121, 200, 110, LIGHT, 3)
+    line(300, 110, 340, 121, LIGHT, 3)
+    for x in (212, 219, 281, 288):
+        line(x, 118, x, 298, LIGHT, 3)
+
+    # String lights: down the front edge, unlit across, up the outer line.
+    poly(LIGHT, 0.8, 215, 311, 215, 470, 108, 470, 118, 455, 178, 366)
+    poly(LIGHT, 0.8, 285, 311, 285, 470, 392, 470, 382, 455, 322, 366)
+    for y in (322, 341, 360, 379, 398, 417, 436, 455):
+        dot(215, y, 3, LIGHT)
+        dot(285, y, 3, LIGHT)
+    for x, y in ((178, 366), (166, 384), (154, 402), (142, 419), (130, 437), (118, 455)):
+        dot(x, y, 3, LIGHT)
+        dot(500 - x, y, 3, LIGHT)
+
+    # Cables.
+    poly(CABLE, 2, 190, 316, 194, 135, 206, 113)
+    line(200, 316, 214, 309, CABLE, 2)
+    line(200, 350, 312, 350, CABLE, 2, dash=[6, 4])
+    line(312, 350, 288, 309, CABLE, 2)
+    poly(CABLE, 2, 312, 350, 306, 135, 294, 113)
+
+    # The pouch, and the four plug-in points.
+    g.add(Rect(X(140), Y(356), 60, 40, rx=4, ry=4, fillColor=colors.HexColor("#D3D1C7"), strokeColor=GREY,
+               strokeWidth=0.5))
+    text(170, 340, "Pouch", anchor="middle", bold=True)
+    for x, y in ((208, 110), (292, 110), (216, 306), (285, 306)):
+        dot(x, y, 5, CABLE)
+
+    label(280, 66, 446, 66, "Collar light, two halves")
+    label(346, 120, 446, 120, "Shoulder strip")
+    label(294, 200, 446, 200, "Lapel lights")
+    label(312, 250, 446, 250, "Cable inside the lining")
+    label(292, 306, 446, 300, "Lapel plug, string plugs in too")
+    label(318, 352, 446, 350, "Around the back, on the belt")
+    label(382, 336, 446, 396, "Belt, worn under the cape")
+    label(366, 428, 446, 446, "String lights, outer line")
+    label(340, 472, 446, 492, "Unlit stretch above the hem")
+
+    # Legend.
+    line(80, 558, 110, 558, LIGHT, 3)
+    text(118, 562, "Strip lights")
+    line(220, 558, 250, 558, CABLE, 2)
+    text(258, 562, "Cable inside the cape's lining")
+    for x in (86, 96, 106):
+        dot(x, 584, 3, LIGHT)
+    text(118, 588, "String lights")
+    line(220, 584, 250, 584, CABLE, 2, dash=[6, 4])
+    text(258, 588, "Cable on the belt, around the back")
+    dot(95, 610, 5, CABLE)
+    text(118, 614, "Plug-in point")
+    return drawing
+
+
 def parse_markdown(md: str):
     """Turn the handoff markdown into a list of flowables."""
     story = []
@@ -106,6 +222,20 @@ def parse_markdown(md: str):
 
         if not stripped:
             flush_para(); flush_list(); i += 1; continue
+
+        if stripped == "[[page-break]]":
+            flush_para(); flush_list()
+            story.append(PageBreak()); i += 1; continue
+
+        if stripped == "[[wiring-drawing]]":
+            flush_para(); flush_list()
+            story.append(KeepTogether([
+                wiring_drawing(),
+                Paragraph("Front view, not to scale. Lights, the pouch, and one way to run the four cables. "
+                          "The lines the lights follow are set on the real cape.", CAPTION),
+                Spacer(1, 8),
+            ]))
+            i += 1; continue
 
         if stripped.startswith("# "):
             flush_para(); flush_list()
@@ -211,13 +341,14 @@ def build():
         "the audience at the keyboard. The unlit image is the construction reference: the lighter charcoal "
         "strips mark where the mesh-faced channels go. Both are AI concept renders, not patterns; the "
         "written handoff takes precedence wherever it disagrees with a picture. In particular, the dots of "
-        "light below the lapels are an open question (section 4 of the handoff), not a settled design.",
+        "light below the lapels will be strings of small lights on thin wire (section 4 of the handoff), "
+        "and the lines they follow are set on the real cape.",
         BODY))
     story.append(Spacer(1, 10))
 
     col_w = (CONTENT_W - 0.3 * inch) / 2
     img_h = 6.6 * inch
-    left = [fitted_image(IMG_ON, col_w, img_h), Paragraph("Lights on, from the audience. Collar outline, two-row lapel bars, shoulder segments, and the dotted lower lines that section 4 asks about.", CAPTION)]
+    left = [fitted_image(IMG_ON, col_w, img_h), Paragraph("Lights on, from the audience. Collar outline, two-row lapel bars, shoulder segments, and the dotted lower lines that section 4 describes.", CAPTION)]
     right = [fitted_image(IMG_OFF, col_w, img_h), Paragraph("Lights off, zone map. Charcoal strips show every channel: collar edges and rim, full-length front channels, shoulders, outer side seams. Nothing in the bottom 15 cm.", CAPTION)]
     t = Table([[left, right]], colWidths=[col_w, col_w], hAlign="CENTER")
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
