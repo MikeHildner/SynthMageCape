@@ -25,15 +25,22 @@ CRGB lapelTwo[LEDS_PER_LAPEL];
 // drawn over more pixels than the strip can have; the strip shows as much of
 // it as it has pixels, and the rest goes nowhere. The picture never changes,
 // whatever is being played:
-//     pixel 1 red, pixel 2 green, pixel 3 blue   (if not, the colour order is wrong)
+//     pixels 1 to 3 red, 4 to 6 green, 7 to 9 blue   (three of each, because
+//         the strip's coating blends neighbours; judge the middle one)
 //     every pixel after that dim, red and blue by turns   (a dark one is dead)
-//     every 10th pixel white, and at every 50th two whites side by side
-// Count: 10 for every white mark, plus the dim pixels after the last mark.
-// Each white mark is the 11th, 21st, 31st... pixel, so add 1 for itself.
+//     every 10th pixel a bright mark: white up to pixel 300, green from the
+//         301st on (the 301st, 311th, 321st...)
+// Count: 300, plus 10 for every green mark after the first, plus the dim
+// pixels after the last green mark, plus 1 for that mark itself.
+//
+// First run, 18 Nov, with a 330-pixel ruler and white marks only: the marks
+// ran to the very end of the strip, so the count is near 320 and the ruler
+// was too short to say exactly.
 const uint8_t COLLAR_TEST_PIN = 6;  // output 3 on the shifter board
-// 330 pixels take just under one 10 ms frame to send. If the ruler runs right
-// to the end of the strip with 32 marks, the strip may be longer than this.
-const uint16_t COLLAR_TEST_PIXELS = 330;
+// 400 pixels take 12 ms to send, longer than one 10 ms frame, so the whole
+// cape refreshes a little slower while this test is in. Fine for a test.
+const uint16_t COLLAR_TEST_PIXELS = 400;
+const uint16_t COLLAR_TEST_GREEN_FROM = 300;
 CRGB collarTest[COLLAR_TEST_PIXELS];
 
 void drawCollarTest() {
@@ -41,14 +48,13 @@ void drawCollarTest() {
     collarTest[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
   }
   for (uint16_t i = 10; i < COLLAR_TEST_PIXELS; i += 10) {
-    collarTest[i] = CRGB(255, 255, 255);
-    if (i % 50 == 0 && i + 1 < COLLAR_TEST_PIXELS) {
-      collarTest[i + 1] = CRGB(255, 255, 255);
-    }
+    collarTest[i] = (i < COLLAR_TEST_GREEN_FROM) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
   }
-  collarTest[0] = CRGB(255, 0, 0);
-  collarTest[1] = CRGB(0, 255, 0);
-  collarTest[2] = CRGB(0, 0, 255);
+  for (uint16_t i = 0; i < 3; i++) {
+    collarTest[i] = CRGB(255, 0, 0);
+    collarTest[3 + i] = CRGB(0, 255, 0);
+    collarTest[6 + i] = CRGB(0, 0, 255);
+  }
 }
 
 const uint32_t FRAME_MS = 10;  // 100 frames a second
