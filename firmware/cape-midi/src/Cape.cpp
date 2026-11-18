@@ -17,28 +17,38 @@ const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 CRGB lapelOne[LEDS_PER_LAPEL];
 CRGB lapelTwo[LEDS_PER_LAPEL];
 
-// ---- bullet string bench test (temporary)
+// ---- collar strip bench test (temporary)
 //
-// One whole, uncut string of 50, to learn three things before anything is
-// cut: that every pixel works, which way the data runs, and the colour order.
-// The same picture goes out on outputs 3 and 4, so either free pigtail on the
-// box will do. It is always the same, whatever is being played:
+// The whole, uncut 2 m collar strip on output 3, to learn three things before
+// anything is cut: that every pixel works, the colour order, and how many
+// pixels the strip has. We do not know the count, so the picture is a ruler
+// drawn over more pixels than the strip can have; the strip shows as much of
+// it as it has pixels, and the rest goes nowhere. The picture never changes,
+// whatever is being played:
 //     pixel 1 red, pixel 2 green, pixel 3 blue   (if not, the colour order is wrong)
-//     the last pixel dim white                   (so the count is right)
-//     one dim white dot walking from pixel 4 towards the far end
-const uint8_t STRING_ONE_PIN = 6;  // output 3 on the shifter board
-const uint8_t STRING_TWO_PIN = 7;  // output 4
-const uint8_t STRING_TEST_PIXELS = 50;
-CRGB stringOne[STRING_TEST_PIXELS];
+//     every pixel after that dim, red and blue by turns   (a dark one is dead)
+//     every 10th pixel white, and at every 50th two whites side by side
+// Count: 10 for every white mark, plus the dim pixels after the last mark.
+// Each white mark is the 11th, 21st, 31st... pixel, so add 1 for itself.
+const uint8_t COLLAR_TEST_PIN = 6;  // output 3 on the shifter board
+// 330 pixels take just under one 10 ms frame to send. If the ruler runs right
+// to the end of the strip with 32 marks, the strip may be longer than this.
+const uint16_t COLLAR_TEST_PIXELS = 330;
+CRGB collarTest[COLLAR_TEST_PIXELS];
 
-void drawStringTest(uint32_t now) {
-  fill_solid(stringOne, STRING_TEST_PIXELS, CRGB::Black);
-  stringOne[0] = CRGB(255, 0, 0);
-  stringOne[1] = CRGB(0, 255, 0);
-  stringOne[2] = CRGB(0, 0, 255);
-  stringOne[STRING_TEST_PIXELS - 1] = CRGB(90, 90, 90);
-  const uint8_t walkers = STRING_TEST_PIXELS - 4;  // pixels 4 to 49
-  stringOne[3 + (now / 120) % walkers] = CRGB(140, 140, 140);
+void drawCollarTest() {
+  for (uint16_t i = 0; i < COLLAR_TEST_PIXELS; i++) {
+    collarTest[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
+  }
+  for (uint16_t i = 10; i < COLLAR_TEST_PIXELS; i += 10) {
+    collarTest[i] = CRGB(255, 255, 255);
+    if (i % 50 == 0 && i + 1 < COLLAR_TEST_PIXELS) {
+      collarTest[i + 1] = CRGB(255, 255, 255);
+    }
+  }
+  collarTest[0] = CRGB(255, 0, 0);
+  collarTest[1] = CRGB(0, 255, 0);
+  collarTest[2] = CRGB(0, 0, 255);
 }
 
 const uint32_t FRAME_MS = 10;  // 100 frames a second
@@ -335,10 +345,9 @@ void drawNotes(uint32_t now) {
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
-  // Bullet pixels use the WS2811 chip, and most strings take colours as
-  // red, green, blue (the strips take green, red, blue). The test shows if not.
-  FastLED.addLeds<WS2811, STRING_ONE_PIN, RGB>(stringOne, STRING_TEST_PIXELS);
-  FastLED.addLeds<WS2811, STRING_TWO_PIN, RGB>(stringOne, STRING_TEST_PIXELS);  // same picture
+  // The collar strip is sold as WS2812B, so start from the lapels' settings
+  // (green, red, blue). The test shows if the colour order is different.
+  FastLED.addLeds<WS2812B, COLLAR_TEST_PIN, GRB>(collarTest, COLLAR_TEST_PIXELS);
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -435,6 +444,6 @@ void capeShow(LinkState state) {
     }
   }
 
-  drawStringTest(now);
+  drawCollarTest();
   FastLED.show();
 }
