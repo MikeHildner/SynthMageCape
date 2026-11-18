@@ -2,20 +2,13 @@
 
 For whoever makes the cape. This sheet goes with the design brief PDF and tells you, in sewing terms, what the lighting hardware needs from the garment. The look, fabric, and silhouette are yours to decide, as the brief says. This sheet only covers where the hardware goes, how big it is, and how it has to come out.
 
-Prepared 20 October 2026 by Mike (electronics and firmware). Revised 18 November 2026, after the electronics were built and tested. Where this sheet and the older brief disagree, this sheet is the newer one.
+Prepared 18 November 2026 by Mike (electronics and firmware), after the electronics were built and tested. Where this sheet and the design brief disagree, this sheet is the newer one.
 
 ## Where things stand
 
 - **Built and working:** the control box, both lapel light pieces, and the wireless link from the keyboard. The lights follow what Mike plays: each key makes a ripple at its own height on the lapel, harder playing is brighter, the pedal holds the glow. Mike can show this on a stand-in cape before you start.
 - **Deliberately not built yet:** the collar light, the shoulder lights, and anything below the lapels. These depend on the real garment, so they wait for your input.
 - **Nothing is fixed that sewing would have to work around.** The lapel pieces can be rebuilt to a different length, and every other piece will be cut to your measurements.
-
-What changed since the October version of this sheet:
-
-- The lapel pieces plug in at their bottom end, near the waist, not at the shoulder.
-- The lights below the lapels are an open question (section 4). The heavy "bullet" lights in the brief are no longer the plan.
-- The microphone on the pouch may be dropped, which would let the pouch be fully hidden.
-- The lights run dimmer than first assumed, on purpose. That affects the choice of mesh.
 
 ## How I would like to work with you
 
@@ -79,7 +72,7 @@ Not built yet. Mike would like to have these if the reach test allows.
 
 ### 4. Below the lapels: open, and I would like your advice
 
-The render shows two more lines of light dots on each side: one continuing down the front edge below the lapel, and an outer line that starts near the waist and angles out towards the hem. (The October sheet called the outer line "the outer side seam". I do not know whether your pattern has a seam there; the line in the render is what I mean.)
+The render shows two more lines of light dots on each side: one continuing down the front edge below the lapel, and an outer line that starts near the waist and angles out towards the hem. (I call it the outer line because I do not know whether your pattern has a seam there; the line in the render is what I mean.)
 
 The brief planned these as strings of sealed "bullet" lights. I have those strings and they work, but they are made for outdoor signs: each light is a resin-sealed plug about 12 mm across and 20 mm long, and forty of them are heavy for fabric that is meant to swing. I would rather not use them.
 
@@ -126,7 +119,7 @@ Rules of thumb for everything that plugs or is sewn in:
 
 - Contents: a power bank and a control box. The control box is about 97 x 91 x 36 mm with rounded corners, and its cables all leave from one of the 91 mm ends. The power bank is the size of a large phone, somewhere between 100 x 60 x 25 mm and 150 x 70 x 30 mm. I will bring both so the pouch is sized against the real objects, and I will weigh them beforehand. Worn on a belt at the hip, under the cape, as the brief shows.
 - **The control box may get slightly smaller or change shape once.** The present box is a first version. I will tell you before the pouch is cut if it changes.
-- **Microphone: probably not needed.** The October sheet asked for the pouch's outer face to stay uncovered, with a mesh window, because the control box has a small microphone that listens to the band. Now that the lights follow the keyboard directly, Mike doubts the microphone is worth having. Please tell me whether an exposed pouch face is easy or awkward for you. If it is awkward, the microphone goes and the pouch can be completely hidden.
+- **Microphone: probably not needed.** The control box can carry a small microphone that listens to the band. It would need the pouch's outer face to stay uncovered, with a mesh window. Now that the lights follow the keyboard directly, Mike doubts the microphone is worth having. Please tell me whether an exposed pouch face is easy or awkward for you. If it is awkward, the microphone goes and the pouch can be completely hidden.
 - **No metal around the pouch.** The control box talks to the keyboard by radio (Bluetooth). Metallic fabric, foil lining, or a metal plate over the pouch would block it. Ordinary fabric, foam, and plastic are fine.
 - Three small buttons and a power switch sit on the pouch flap, on wires about 40 cm long. Mike must be able to reach them without help while wearing the cape. The power switch is the real off switch for everything.
 - Four cables leave the pouch: two short ones to the lapel bottoms, two long ones up to the shoulders.
@@ -143,7 +136,7 @@ Rules of thumb for everything that plugs or is sewn in:
 
 A black diffusion mesh over every lit zone, so with the lights off the cape reads as a plain black cape with the silhouette doing the work, which is the brief's own priority. Where you can, a little stand-off between the lights and the mesh makes the dots blur into a glow.
 
-**Please do not buy mesh in quantity before we have tested a scrap.** The lights run deliberately dim: this is a costume for a dark stage, and the aim is a glow that does not overwhelm the other players or the audience. The October sheet said the lights would push through black mesh with no trouble. At the brightness Mike actually wants, that is no longer certain, and a dense mesh could swallow the light. The test is simple: hold the scrap over the working lapel in a dark room.
+**Please do not buy mesh in quantity before we have tested a scrap.** The lights run deliberately dim: this is a costume for a dark stage, and the aim is a glow that does not overwhelm the other players or the audience. At that brightness I do not yet know how much a black mesh takes away, and a dense mesh could swallow the light. The test is simple: hold the scrap over the working lapel in a dark room.
 
 ## The first fitting
 
