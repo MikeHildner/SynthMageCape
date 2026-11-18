@@ -17,6 +17,19 @@ What changed since the October version of this sheet:
 - The microphone on the pouch may be dropped, which would let the pouch be fully hidden.
 - The lights run dimmer than first assumed, on purpose. That affects the choice of mesh.
 
+## How I would like to work with you
+
+The lights are not all finished, and I do not want you to wait for them. I would like to do this in stages, with a gap in the middle. Please tell me at the start whether that suits you, since it affects your schedule and your price.
+
+1. **Before any fabric is cut:** we talk through this sheet and I show you the working lapel. A few things have to be decided at this point because they are hard to add later: the width of the lapel facing, a collar stiff enough to carry a strip, a lining that cables can run behind, and shoulder pieces that pass the reach test.
+2. **You make the cape, deliberately unfinished where the lights go.** The lining stays open, the channels are not sewn yet, and the hem is left for last.
+3. **I pin on the lights and the control box,** try the cape at the keyboard, and adjust until it is right. This is the gap: it may take me a few weeks.
+4. **You finish it around the real hardware:** channels, mesh, the pouch, openings for the cables, and closing everything up.
+
+What can wait until stage 4: the exact length of each light piece, whether anything is lit below the lapels and with what (section 4), the mesh, and the pouch.
+
+If you would work differently, tell me. You know how a garment goes together and I do not.
+
 ## The short version
 
 - Lit zones: the collar outline, two lapels, two shoulders. Possibly dots of light below the lapels and along an outer line on each side. Nothing lit within 15 cm of the hem.
@@ -134,14 +147,20 @@ A black diffusion mesh over every lit zone, so with the lights off the cape read
 
 ## The first fitting
 
+This belongs to stage 1, before the real fabric is cut:
+
 1. Plain fabric mockup, no lights, per the brief.
 2. Foam shoulder mockups on. Mike reaches across the full width of the keyboard (88 keys) and to the controls at both ends. No cape panel touches the keys. This decides whether the shoulders get lights.
 3. Decide the lapel facing width (50 mm or more preferred) and the lapel length.
-4. Decide what, if anything, is lit below the lapels (section 4).
-5. Place the pouch on the belt, and decide whether its outer face can show.
-6. Confirm the collar front edges are straight and stiff enough to carry a strip.
-7. Confirm safe hem clearance from the stage floor, per the brief.
-8. Hold mesh samples over the working lapel in a darkened room.
+4. Confirm the collar front edges are straight and stiff enough to carry a strip.
+5. Confirm safe hem clearance from the stage floor, per the brief.
+6. Look at where lights below the lapels could run (section 4), so the pattern leaves room for them. The decision itself can wait.
+
+These can wait until the lights are pinned on (stage 3 or 4):
+
+- Whether anything is lit below the lapels, and with what.
+- Where the pouch sits on the belt, and whether its outer face can show.
+- Mesh samples held over the working lights in a darkened room.
 
 ## What Mike will bring
 
