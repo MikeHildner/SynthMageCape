@@ -26,6 +26,8 @@ MD = DOCS / "designer-handoff.md"
 OUT = DOCS / "Synth_Mage_Designer_Handoff.pdf"
 IMG_ON = DOCS / "renders" / "lights-on-front.png"
 IMG_OFF = DOCS / "renders" / "lights-off-zone-map.png"
+IMG_VIDEO = DOCS / "renders" / "video-thumbnail.png"
+VIDEO_URL = "https://youtu.be/ja1__TgNOSs"
 
 PAGE_W, PAGE_H = letter
 MARGIN = 0.8 * inch
@@ -151,6 +153,44 @@ def fitted_image(path: Path, max_w: float, max_h: float) -> Image:
     return img
 
 
+class LinkedImage(Image):
+    """An image that opens a web address when clicked."""
+
+    def __init__(self, path, url, **kwargs):
+        super().__init__(path, **kwargs)
+        self.url = url
+
+    def draw(self):
+        super().draw()
+        self.canv.linkURL(self.url, (0, 0, self.drawWidth, self.drawHeight), relative=1)
+
+
+def video_block():
+    """The thumbnail of the demonstration video beside its link."""
+    thumb = LinkedImage(str(IMG_VIDEO), VIDEO_URL)
+    thumb_w = 2.2 * inch
+    thumb.drawHeight = thumb.imageHeight * thumb_w / thumb.imageWidth
+    thumb.drawWidth = thumb_w
+    text = [
+        Paragraph("Video: the working lapels", H3),
+        Paragraph(
+            "A short clip of the two lapel light pieces on a stand-in cape, following what Mike plays "
+            "on the keyboard. This is the real hardware, not a render. A webcam flattens the colours; "
+            "they are richer to the eye.",
+            BODY),
+        # Not underlined: an underline would hide the two underscores in the address.
+        Paragraph(f"<a href='{VIDEO_URL}' color='#1a55aa'>{VIDEO_URL}</a>", BODY),
+    ]
+    t = Table([[thumb, text]], colWidths=[thumb_w + 0.25 * inch, CONTENT_W - thumb_w - 0.25 * inch])
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return t
+
+
 def footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
@@ -182,6 +222,8 @@ def build():
     t = Table([[left, right]], colWidths=[col_w, col_w], hAlign="CENTER")
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     story.append(t)
+    story.append(Spacer(1, 18))
+    story.append(video_block())
     story.append(PageBreak())
 
     story.extend(parse_markdown(md))
