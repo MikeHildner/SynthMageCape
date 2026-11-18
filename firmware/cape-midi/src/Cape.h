@@ -26,12 +26,27 @@ const uint16_t MAX_MILLIAMPS = 1500;
 const uint8_t LOWEST_NOTE = 21;
 const uint8_t HIGHEST_NOTE = 108;
 
+// Which colours the notes get.
+//     Warm       every note the same warm white (the first look, 17 Nov)
+//     NoteNames  each note name has its own colour, the same in every octave:
+//                C red, then round the colour wheel a step per semitone
+//                (D orange-yellow, E yellow-green, F green, G blue, A purple, B pink)
+// Neither look changes the brightness ceiling above.
+enum class Look { Warm, NoteNames };
+const Look LOOK = Look::NoteNames;
+
+// Keys from this note up play an organ on the Kronos program in use (piano
+// below). Organ keys do not ripple: while one is held, the lapels carry a soft
+// travelling wash of its colour. 96 is C7 (60 is C4). Set to 128 for no organ keys.
+const uint8_t ORGAN_FROM_NOTE = 96;
+
 enum class LinkState { Scanning, Connecting, Connected };
 
 void capeBegin();
 
 // A key was struck: a ripple spreads from the row for that pitch, as bright as
 // the key was struck, and the row keeps a low glow while the key is held.
+// (An organ key starts a wash instead; see ORGAN_FROM_NOTE.)
 void capeNoteOn(uint8_t note, uint8_t velocity);
 void capeNoteOff(uint8_t note);
 void capeAllNotesOff();
@@ -41,7 +56,7 @@ void capeAllNotesOff();
 void capePedal(uint8_t value);
 
 // Pitch bend moved (-8192 to 8191, 0 at rest). It turns the colour of
-// everything that is lit: right towards aqua, left towards purple.
+// everything that is lit, by up to three eighths of a turn either way.
 void capeBend(int bend);
 
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.

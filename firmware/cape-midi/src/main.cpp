@@ -11,10 +11,12 @@
 //     hem row blinking blue     searching for the WIDI Master
 //     hem row steady blue       connecting
 //     one green sweep upward    connected
-//     warm ripple from a row    a key was struck: the row is the pitch, the
-//                               brightness is how hard it was struck
-//     low warm glow on a row    that key is being held, or was released with
+//     ripple from a row         a key was struck: the row is the pitch, the
+//                               brightness is how hard it was struck, and the
+//                               colour is the note name (see LOOK in Cape.h)
+//     low glow on a row         that key is being held, or was released with
 //                               the sustain pedal down (deeper pedal, brighter)
+//     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 

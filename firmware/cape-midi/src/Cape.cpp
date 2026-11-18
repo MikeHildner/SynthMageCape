@@ -54,6 +54,7 @@ const float HELD_GLOW = 0.30f;           // a held key glows at this fraction of
 
 struct Ripple {
   bool active;
+  uint8_t note;    // decides the colour
   float row;
   float strength;  // 0..1, from velocity
   uint32_t startMs;
@@ -78,6 +79,8 @@ float pedalDepth = 0;     // 0.5 (just down) to 1 (fully down)
 uint32_t connectedAtMs = 0;
 LinkState lastState = LinkState::Scanning;
 
+bool isOrganNote(uint8_t note) { return note >= ORGAN_FROM_NOTE; }
+
 float rowOfNote(uint8_t note) {
   if (note <= LOWEST_NOTE) return 0;
   if (note >= HIGHEST_NOTE) return ROWS - 1;
@@ -96,39 +99,93 @@ void setRow(uint8_t row, const CRGB& colour) {
 //
 // Hue is a position on FastLED's colour wheel, 0-255: 0 red, 32 orange,
 // 64 yellow, 96 green, 128 aqua, 160 blue, 192 purple, 224 pink.
-// At rest everything is a warm white. Pitch bend turns the wheel for everything
-// that is lit: fully right reaches aqua by way of yellow and green, fully left
-// reaches purple by way of red and pink. The joystick springs back, and so
-// does the colour.
-const uint8_t BASE_HUE = 36;          // warm orange...
+//
+// Look::Warm: every note is the same warm white.
+// Look::NoteNames: the twelve note names are spread evenly round the wheel,
+// starting with C at NOTE_HUE_OF_C, in full colour. A C is the same colour in
+// every octave; a scale walks round the wheel; a chord shows its notes as
+// separate colours.
+//
+// Pitch bend turns the wheel for everything that is lit, by up to
+// BEND_HUE_RANGE either way. The joystick springs back, and so does the colour.
+const uint8_t BASE_HUE = 36;          // Warm look: warm orange...
 const uint8_t BASE_SATURATION = 170;  // ...with enough white in it to read as warm white
+const float COLOUR_GAIN = 1.42f;      // Warm look: brings that colour up to full scale
+const uint8_t NOTE_HUE_OF_C = 0;      // NoteNames look: C is red
 const float BEND_HUE_RANGE = 96;      // how far full bend turns the wheel, either way
-const float COLOUR_GAIN = 1.42f;      // brings the resting colour up to full scale
 
-uint8_t hueNow = BASE_HUE;
+uint8_t hueShift = 0;  // from pitch bend; added to every hue, wrapping round the wheel
 
-// level 0..1 to a colour at the current hue.
-CRGB colourAt(float level) {
-  if (level <= 0) return CRGB::Black;
-  if (level > 1) level = 1;
-  const CRGB full = CHSV(hueNow, BASE_SATURATION, 255);
-  const float gain = level * COLOUR_GAIN;
-  return CRGB((uint8_t)min(255.0f, full.r * gain), (uint8_t)min(255.0f, full.g * gain),
-              (uint8_t)min(255.0f, full.b * gain));
+// A colour in red, green and blue, 0-255 each, kept as fractions while several
+// lights are being mixed. It may run past 255 on the way; toLeds() limits it.
+struct Colour {
+  float r, g, b;
+};
+
+// The colour of a note at full level.
+Colour colourOfNote(uint8_t note) {
+  uint8_t hue = BASE_HUE;
+  uint8_t saturation = BASE_SATURATION;
+  float gain = COLOUR_GAIN;
+  if (LOOK == Look::NoteNames) {
+    hue = (uint8_t)(NOTE_HUE_OF_C + (note % 12) * 256 / 12);
+    saturation = 255;
+    gain = 1;
+  }
+  const CRGB full = CHSV((uint8_t)(hue + hueShift), saturation, 255);
+  return {full.r * gain, full.g * gain, full.b * gain};
 }
+
+// Adds `amount` (0..1) of a colour to what is there.
+void addColour(Colour& to, const Colour& colour, float amount) {
+  to.r += colour.r * amount;
+  to.g += colour.g * amount;
+  to.b += colour.b * amount;
+}
+
+// Raises what is there to at least `amount` of a colour, channel by channel.
+void raiseColour(Colour& to, const Colour& colour, float amount) {
+  to.r = fmaxf(to.r, colour.r * amount);
+  to.g = fmaxf(to.g, colour.g * amount);
+  to.b = fmaxf(to.b, colour.b * amount);
+}
+
+CRGB toLeds(const Colour& colour) {
+  return CRGB((uint8_t)fminf(255.0f, colour.r), (uint8_t)fminf(255.0f, colour.g),
+              (uint8_t)fminf(255.0f, colour.b));
+}
+
+// ---- the organ keys
+//
+// Keys from ORGAN_FROM_NOTE up play an organ, which sounds for as long as the
+// key is down and does not die away. So these keys do not ripple. While one is
+// held, both lapels carry a soft wash of its colour, with slow swells
+// travelling up them, like the turning speaker of an organ. Several organ keys
+// mix their colours. The sustain pedal does not hold the wash.
+const float ORGAN_WASH_LEVEL = 0.22f;   // the wash at its brightest, 0..1 of the ceiling
+const float ORGAN_SWELL_DEPTH = 0.65f;  // how far the wash dips between swells, 0 = flat
+const float ORGAN_SWELL_ROWS = 16;      // length of one swell along the lapel
+const float ORGAN_SWELL_MS = 900;       // time a swell takes to travel its own length
+const float ORGAN_ATTACK_MS = 60;       // the wash comes up this fast
+const float ORGAN_RELEASE_MS = 300;     // and falls away this fast
+
+float organLevel[128];  // 0..1, how far each organ key's wash has come up
 
 // ---- sparkle
 //
 // The bigger the chord, the more the lapels shimmer: single LEDs anywhere on
-// either lapel flash briefly, paler than the note colour. Counted are the keys
-// held down plus the notes the pedal is holding.
+// either lapel flash briefly. Counted are the keys held down plus the notes
+// the pedal is holding. In the Warm look a sparkle is nearly white; in the
+// NoteNames look each sparkle takes a colour of its own.
 const uint8_t SPARKLE_FROM_NOTES = 3;      // no sparkle below this many notes
 const uint8_t SPARKLE_FULL_AT_NOTES = 8;   // this many or more gives the full rate
 const float SPARKLES_PER_SECOND = 30;      // the full rate, across both lapels
 const float SPARKLE_FADE_MS = 150;         // a sparkle falls to about a third in this time
-const uint8_t SPARKLE_SATURATION = 70;     // low = nearly white
+const uint8_t SPARKLE_SATURATION = 70;         // Warm look: low = nearly white
+const uint8_t SPARKLE_SATURATION_COLOUR = 200; // NoteNames look: coloured, a little pale
 
-float sparkle[2][LEDS_PER_LAPEL];  // 0..1, per LED, per lapel
+float sparkle[2][LEDS_PER_LAPEL];       // 0..1, per LED, per lapel
+uint8_t sparkleHue[2][LEDS_PER_LAPEL];  // NoteNames look: each sparkle's own hue
 
 void drawSparkle(uint8_t notesSounding, float elapsedMs) {
   // New sparkles for this frame. The fractional part becomes a probability.
@@ -140,7 +197,10 @@ void drawSparkle(uint8_t notesSounding, float elapsedMs) {
   float due = rate * elapsedMs / 1000.0f;
   while (due > 0) {
     if (due >= 1 || random8() < (uint8_t)(due * 255)) {
-      sparkle[random8(2)][random8(LEDS_PER_LAPEL)] = 0.5f + random8() / 510.0f;  // 0.5 to 1
+      const uint8_t lapel = random8(2);
+      const uint8_t led = random8(LEDS_PER_LAPEL);
+      sparkle[lapel][led] = 0.5f + random8() / 510.0f;  // 0.5 to 1
+      sparkleHue[lapel][led] = random8();
     }
     due -= 1;
   }
@@ -157,12 +217,54 @@ void drawSparkle(uint8_t notesSounding, float elapsedMs) {
         level = 0;
         continue;
       }
-      lapels[lapel][i] += CHSV(hueNow, SPARKLE_SATURATION, (uint8_t)(255 * level));
+      const uint8_t value = (uint8_t)(255 * level);
+      if (LOOK == Look::NoteNames) {
+        lapels[lapel][i] += CHSV((uint8_t)(sparkleHue[lapel][i] + hueShift), SPARKLE_SATURATION_COLOUR, value);
+      } else {
+        lapels[lapel][i] += CHSV((uint8_t)(BASE_HUE + hueShift), SPARKLE_SATURATION, value);
+      }
     }
   }
 }
 
+// Adds the organ keys' wash to every row.
+void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
+  Colour mix = {0, 0, 0};
+  float total = 0;
+  for (uint8_t note = ORGAN_FROM_NOTE; note < 128; note++) {
+    float& level = organLevel[note];
+    const float target = heldVelocity[note] > 0 ? 1.0f : 0.0f;
+    if (level == target) {
+      if (level == 0) continue;
+    } else {
+      const float time = target > level ? ORGAN_ATTACK_MS : ORGAN_RELEASE_MS;
+      level += (target - level) * (1.0f - expf(-elapsedMs / time));
+      if (target == 0 && level < 0.01f) {
+        level = 0;
+        continue;
+      }
+    }
+    addColour(mix, colourOfNote(note), level);
+    total += level;
+  }
+  if (total == 0) return;
+
+  // The mix is the average colour of the organ keys. More keys do not make
+  // the wash brighter: one key already brings it to its level.
+  const float amount = ORGAN_WASH_LEVEL * fminf(1.0f, total) / total;
+  const float phase = (float)(now % (uint32_t)ORGAN_SWELL_MS) / ORGAN_SWELL_MS;
+  for (uint8_t row = 0; row < ROWS; row++) {
+    const float swell = 0.5f + 0.5f * sinf(TWO_PI * (row / ORGAN_SWELL_ROWS - phase));
+    addColour(rows[row], mix, amount * (1.0f - ORGAN_SWELL_DEPTH * (1.0f - swell)));
+  }
+}
+
 void drawNotes(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  const float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+
+  Colour rows[ROWS] = {};
   float level[ROWS] = {0};
   uint8_t notesSounding = 0;
 
@@ -176,28 +278,38 @@ void drawNotes(uint32_t now) {
     const float remaining = 1.0f - age / RIPPLE_LIFE_MS;
     const float fade = remaining * remaining;
     const float radius = age * RIPPLE_ROWS_PER_MS;
+    const Colour colour = colourOfNote(ripple.note);
     for (uint8_t row = 0; row < ROWS; row++) {
       // Distance from this row to the nearer of the two wavefronts.
       const float distance = fabsf(fabsf((float)row - ripple.row) - radius);
       if (distance < RIPPLE_WIDTH_ROWS) {
-        level[row] += ripple.strength * fade * (1.0f - distance / RIPPLE_WIDTH_ROWS);
+        const float amount = ripple.strength * fade * (1.0f - distance / RIPPLE_WIDTH_ROWS);
+        addColour(rows[row], colour, amount);
+        level[row] += amount;
       }
     }
   }
+  // Where ripples pile up past full level, bring the row back to full level
+  // and keep the mix of colours.
+  for (uint8_t row = 0; row < ROWS; row++) {
+    if (level[row] > 1) {
+      rows[row].r /= level[row];
+      rows[row].g /= level[row];
+      rows[row].b /= level[row];
+    }
+  }
 
+  // Keys being held: a low glow on the key's row. (Organ keys wash instead.)
   for (uint8_t note = 0; note < 128; note++) {
     if (heldVelocity[note] == 0) continue;
     notesSounding++;
+    if (isOrganNote(note)) continue;
     const uint8_t row = (uint8_t)(rowOfNote(note) + 0.5f);
-    const float glow = HELD_GLOW * heldVelocity[note] / 127.0f;
-    if (level[row] < glow) level[row] = glow;
+    raiseColour(rows[row], colourOfNote(note), HELD_GLOW * heldVelocity[note] / 127.0f);
   }
 
   // Notes the pedal is holding. They fade slowly while it is down and quickly
   // once it is up.
-  static uint32_t lastDrawMs = now;
-  const float elapsed = (float)(now - lastDrawMs);
-  lastDrawMs = now;
   const float keep = expf(-elapsed / (pedalDown ? PEDAL_HOLD_FADE_MS : PEDAL_RELEASE_FADE_MS));
   for (uint8_t note = 0; note < 128; note++) {
     if (sustainLevel[note] == 0) continue;
@@ -208,11 +320,12 @@ void drawNotes(uint32_t now) {
     }
     if (pedalDown) notesSounding++;
     const uint8_t row = (uint8_t)(rowOfNote(note) + 0.5f);
-    const float glow = sustainLevel[note] * (pedalDown ? pedalDepth : 1.0f);
-    if (level[row] < glow) level[row] = glow;
+    raiseColour(rows[row], colourOfNote(note), sustainLevel[note] * (pedalDown ? pedalDepth : 1.0f));
   }
 
-  for (uint8_t row = 0; row < ROWS; row++) setRow(row, colourAt(level[row]));
+  addOrganWash(rows, now, elapsed);
+
+  for (uint8_t row = 0; row < ROWS; row++) setRow(row, toLeds(rows[row]));
 
   drawSparkle(notesSounding, elapsed);
 }
@@ -236,6 +349,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
   note &= 0x7F;
   heldVelocity[note] = velocity;
   sustainLevel[note] = 0;  // struck again: the key's own glow takes over
+  if (isOrganNote(note)) return;  // organ keys wash, they do not ripple
 
   // Reuse a finished ripple, or failing that the oldest one.
   Ripple* slot = &ripples[0];
@@ -247,6 +361,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
     if (ripple.startMs < slot->startMs) slot = &ripple;
   }
   slot->active = true;
+  slot->note = note;
   slot->row = rowOfNote(note);
   slot->strength = velocity / 127.0f;
   slot->startMs = millis();
@@ -255,7 +370,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
 void capeNoteOff(uint8_t note) {
   note &= 0x7F;
   // Key up with the pedal down: the pedal takes over the glow.
-  if (pedalDown && heldVelocity[note] > 0) {
+  if (pedalDown && heldVelocity[note] > 0 && !isOrganNote(note)) {
     sustainLevel[note] = HELD_GLOW * heldVelocity[note] / 127.0f;
   }
   heldVelocity[note] = 0;
@@ -274,16 +389,18 @@ void capePedal(uint8_t value) {
 }
 
 void capeBend(int bend) {
-  // bend is -8192..8191; uint8_t arithmetic wraps round the colour wheel.
-  hueNow = (uint8_t)(BASE_HUE + (int)lroundf(bend * BEND_HUE_RANGE / 8192.0f));
+  // bend is -8192..8191. Turning the result into a uint8_t wraps a turn to
+  // the left (negative) round the colour wheel.
+  hueShift = (uint8_t)(int)lroundf(bend * BEND_HUE_RANGE / 8192.0f);
 }
 
 void capeBlank() { FastLED.clear(true); }
 
 void capeAllNotesOff() {
-  hueNow = BASE_HUE;
+  hueShift = 0;
   memset(heldVelocity, 0, sizeof(heldVelocity));
   memset(sustainLevel, 0, sizeof(sustainLevel));
+  memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
