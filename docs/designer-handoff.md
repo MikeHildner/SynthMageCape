@@ -2,7 +2,7 @@
 
 For whoever makes the cape. This sheet goes with the design brief PDF and tells you, in sewing terms, what the lighting hardware needs from the garment. The look, fabric, and silhouette are yours to decide, as the brief says. This sheet only covers where the hardware goes, how big it is, and how it has to come out.
 
-Prepared 20 October 2026 by Mike (electronics and firmware). Revised 17 November 2026, after the electronics were built and tested. Where this sheet and the older brief disagree, this sheet is the newer one.
+Prepared 20 October 2026 by Mike (electronics and firmware). Revised 18 November 2026, after the electronics were built and tested. Where this sheet and the older brief disagree, this sheet is the newer one.
 
 ## Where things stand
 

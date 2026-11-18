@@ -155,7 +155,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#777777"))
-    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / revised 17 November 2026")
+    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / revised 18 November 2026")
     canvas.drawRightString(PAGE_W - MARGIN, 0.5 * inch, f"Page {doc.page}")
     canvas.restoreState()
 
