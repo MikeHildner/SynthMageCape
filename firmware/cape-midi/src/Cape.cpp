@@ -273,13 +273,12 @@ Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the
 //
 // The cure is dithering: to show 4.5 steps, every other pixel shows 4 and the
 // ones between show 5. The strip's coating and the tube blend neighbours, so
-// the collar reads as 4.5. For the quarter steps, a pixel also swaps between
-// its two values on alternate frames, about 50 times a second, too fast to
-// see. Together that gives four times as many levels.
+// the collar reads as 4.5. That doubles the number of levels.
 //
-// The pattern stays where it is: even pixels and odd pixels, nothing more.
-// A first version (19 Nov) moved a four-pixel pattern along the strip every
-// frame, and Mike could see it crawl.
+// The pattern never changes in time: a pixel's value depends only on the
+// level and on whether the pixel is even or odd. Two earlier versions
+// (19 Nov) also swapped pixels from frame to frame to get quarter steps;
+// Mike could see both of them crawl.
 // FastLED's own dithering is switched off for the collar (see capeBegin), so
 // the two do not fight.
 //
@@ -337,15 +336,13 @@ void drawCollar(uint32_t now) {
   collarGlow.g += (target.g - collarGlow.g) * step;
   collarGlow.b += (target.b - collarGlow.b) * step;
 
-  // Four thresholds, a quarter of a step apart: two for the even pixels and
-  // two for the odd ones, one per frame of a pair. At a half step, the even
-  // pixels are up in one frame and the odd pixels in the other.
-  static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
-  static uint8_t frame = 0;
-  frame ^= 1;
+  // Even pixels round up from a quarter of a step, odd pixels from three
+  // quarters. So on the way down, the odd pixels drop a step first and the
+  // even pixels follow half a step later.
+  static const float THRESHOLD[2] = {0.25f, 0.75f};
   fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
   for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
-    const float threshold = THRESHOLD[i & 1][frame];
+    const float threshold = THRESHOLD[i & 1];
     collar[i] = CRGB(ditheredChannel(collarGlow.r, threshold), ditheredChannel(collarGlow.g, threshold),
                      ditheredChannel(collarGlow.b, threshold));
   }
