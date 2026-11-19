@@ -240,7 +240,10 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
 // The collar does not ripple or sparkle; the lapels are the main event. While
 // notes sound it glows in one even colour, the blend of every note sounding
 // (keys held, and notes the pedal is holding), as bright as the loudest of
-// them. It comes up quickly and falls away slowly. It sits right under the
+// them. It comes up quickly and falls away slowly. While the cape is looking
+// for the keyboard, a short mark at each collar bottom blinks with the hem
+// row, and the green sweep that says "connected" carries on from the lapel
+// tops round the collar to meet at the back. It sits right under the
 // wearer's face, so it is the quietest light on the cape: COLLAR_LEVEL is the
 // most it ever shows, as a fraction of the brightness ceiling.
 //
@@ -255,10 +258,48 @@ const uint16_t COLLAR_STRIP_PIXELS = 320;  // everything plugged into output 3
 const uint16_t COLLAR_PIXELS = 128;        // the part that is the collar: 80 cm
 const float COLLAR_LEVEL = 0.30f;          // the glow at its brightest, 0..1 of the ceiling
 const float COLLAR_ATTACK_MS = 80;         // the glow comes up this fast
-const float COLLAR_RELEASE_MS = 500;       // and falls away this fast
+const float COLLAR_RELEASE_MS = 300;       // and falls away this fast
+const uint8_t COLLAR_MARK_PIXELS = 4;      // length of the link-state marks, about 2.5 cm
+const uint32_t COLLAR_SWEEP_MS = 400;      // the connected sweep takes this long round the collar
 
 CRGB collar[COLLAR_STRIP_PIXELS];
 Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the notes' blend
+
+// Why the collar needs help to fade smoothly. An LED takes whole numbers,
+// 0-255, and the brightness ceiling scales everything down to 0-32. The
+// collar's glow tops out near 10 of those steps, so a plain fade would come
+// down a staircase of ten visible steps, with each colour channel stepping
+// at a different moment.
+//
+// The cure is dithering: to show 4.25 steps, three pixels in four show 4 and
+// one shows 5, and which pixels are the brighter ones changes every frame.
+// The strip's coating and the tube blend neighbours, and the eye blends
+// frames, so the collar reads as 4.25. That gives four times as many levels.
+// FastLED's own dithering is switched off for the collar (see capeBegin), so
+// the two do not fight.
+//
+// One channel of one pixel: `value` is the wanted level, 0-255 before the
+// ceiling; `threshold` (0..1) decides whether this pixel rounds up.
+uint8_t ditheredChannel(float value, float threshold) {
+  // The level in the LED's own steps after the ceiling, e.g. 4.25.
+  const float steps = fminf(255.0f, value) * MAX_BRIGHTNESS / 256.0f;
+  uint16_t whole = (uint16_t)steps;
+  if (steps - whole > threshold) whole++;
+  // The smallest value that the ceiling turns into exactly `whole` steps.
+  const uint16_t out = (whole * 256 + MAX_BRIGHTNESS - 1) / MAX_BRIGHTNESS;
+  return out > 255 ? 255 : (uint8_t)out;
+}
+
+// Lights a short mark on each side of the collar, `offset` pixels in from its
+// two ends. The ends are the collar bottoms, next to the lapel tops.
+void collarMarks(uint16_t offset, const CRGB& colour) {
+  for (uint8_t i = 0; i < COLLAR_MARK_PIXELS; i++) {
+    const uint16_t pixel = offset + i;
+    if (pixel >= COLLAR_PIXELS / 2) break;
+    collar[pixel] = colour;
+    collar[COLLAR_PIXELS - 1 - pixel] = colour;
+  }
+}
 
 void drawCollar(uint32_t now) {
   static uint32_t lastDrawMs = now;
@@ -291,8 +332,19 @@ void drawCollar(uint32_t now) {
   collarGlow.g += (target.g - collarGlow.g) * step;
   collarGlow.b += (target.b - collarGlow.b) * step;
 
+  // Four thresholds, a quarter of a step apart. Neighbouring pixels get
+  // different ones, and every pixel meets all four in four frames. The order
+  // of the shifts (0, 2, 1, 3) keeps the pattern from crawling one way.
+  static const float THRESHOLD[4] = {0.125f, 0.625f, 0.375f, 0.875f};
+  static const uint8_t SHIFT[4] = {0, 2, 1, 3};
+  static uint8_t frame = 0;
+  frame++;
   fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
-  fill_solid(collar, COLLAR_PIXELS, toLeds(collarGlow));
+  for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
+    const float threshold = THRESHOLD[(i + SHIFT[frame & 3]) & 3];
+    collar[i] = CRGB(ditheredChannel(collarGlow.r, threshold), ditheredChannel(collarGlow.g, threshold),
+                     ditheredChannel(collarGlow.b, threshold));
+  }
 }
 
 void collarDark() {
@@ -376,7 +428,8 @@ void drawNotes(uint32_t now) {
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
-  FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
+  // The collar does its own dithering (see ditheredChannel).
+  FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS).setDither(DISABLE_DITHER);
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -462,6 +515,7 @@ void capeShow(LinkState state) {
     fill_solid(lapelTwo, LEDS_PER_LAPEL, CRGB::Black);
     setRow(0, lit ? CRGB(0, 0, 120) : CRGB::Black);
     collarDark();
+    if (lit) collarMarks(0, CRGB(0, 0, 120));
   } else {
     drawNotes(now);
     drawCollar(now);
@@ -473,6 +527,10 @@ void capeShow(LinkState state) {
     if (sinceConnect < SWEEP_MS) {
       const uint8_t row = (uint8_t)(sinceConnect * (ROWS - 1) / SWEEP_MS);
       setRow(row, CRGB(0, 120, 0));
+    } else if (sinceConnect < SWEEP_MS + COLLAR_SWEEP_MS) {
+      // ...and carries on round the collar, from both bottoms to the back.
+      const uint32_t travel = COLLAR_PIXELS / 2 - COLLAR_MARK_PIXELS;
+      collarMarks((uint16_t)((sinceConnect - SWEEP_MS) * travel / COLLAR_SWEEP_MS), CRGB(0, 120, 0));
     }
   }
 

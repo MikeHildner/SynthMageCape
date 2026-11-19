@@ -8,9 +8,10 @@
 // At home it also joins Wi-Fi, for updates and the log (see Net.h).
 //
 // What the lights mean:
-//     hem row blinking blue     searching for the WIDI Master
+//     hem row blinking blue     searching for the WIDI Master (the collar
+//                               bottoms blink with it)
 //     hem row steady blue       connecting
-//     one green sweep upward    connected
+//     one green sweep upward    connected (up the lapels, then round the collar)
 //     ripple from a row         a key was struck: the row is the pitch, the
 //                               brightness is how hard it was struck, and the
 //                               colour is the note name (see LOOK in Cape.h)
