@@ -25,6 +25,32 @@ CRGB lapelTwo[LEDS_PER_LAPEL];
 // ditheredChannel), so anything that lengthens a frame is worth a second look.
 const uint32_t FRAME_MS = 5;
 
+// ---- fairy string bench test (temporary)
+//
+// One whole, uncut fairy string on output 4, to learn before anything is cut:
+// which end is the input, that every light works, the colour order, and how
+// many lights a strand has (the listing does not say: 50 or 100). The picture
+// is a ruler longer than the strand can be, and never changes:
+//     light 1 red, light 2 green, light 3 blue   (if not, the colour order is wrong)
+//     every light after that dim, red and blue by turns   (a dark one is dead)
+//     every 10th light a bright mark: white, and green from the 101st on
+// Count: 10 for every mark, plus the dim lights after the last mark, plus 1.
+const uint8_t STRING_TEST_PIN = 7;  // output 4 on the shifter board
+const uint8_t STRING_TEST_PIXELS = 120;
+CRGB stringTest[STRING_TEST_PIXELS];
+
+void drawStringTest() {
+  for (uint8_t i = 0; i < STRING_TEST_PIXELS; i++) {
+    stringTest[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
+  }
+  for (uint8_t i = 10; i < STRING_TEST_PIXELS; i += 10) {
+    stringTest[i] = (i < 100) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
+  }
+  stringTest[0] = CRGB(255, 0, 0);
+  stringTest[1] = CRGB(0, 255, 0);
+  stringTest[2] = CRGB(0, 0, 255);
+}
+
 // ---- ripples
 
 // How a struck key looks: two wavefronts leave the key's row, one towards the
@@ -441,6 +467,9 @@ void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
   CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
+  // The fairy string is sold as WS2812B. Start from the strips' colour order
+  // (green, red, blue); the test shows if the string's is different.
+  FastLED.addLeds<WS2812B, STRING_TEST_PIN, GRB>(stringTest, STRING_TEST_PIXELS);
   // FastLED's own dithering stays off everywhere. The collar does its own
   // (see ditheredChannel). The lapels have never had it: FastLED only dithers
   // at 100 frames a second or more, and the cape ran just under that until
@@ -561,6 +590,7 @@ void capeShow(LinkState state) {
     }
   }
 
+  drawStringTest();
   FastLED.show();
 
   framesThisSecond++;
