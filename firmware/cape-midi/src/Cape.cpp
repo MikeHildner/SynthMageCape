@@ -247,10 +247,12 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
 // The strip: 160 pixels a metre, WS2812B, green-red-blue order like the
 // lapels, input at the socket end. On the bench it is still the whole uncut
 // 2 m (320 pixels). The collar is the first COLLAR_PIXELS from the input end;
-// the rest is sent black every frame so it stays dark.
+// the rest is sent black every frame so it stays dark. On the mock cape the
+// path is 80 cm: 15 cm up one side of the collar, 50 cm round the top, 15 cm
+// down the other side (measured 19 Nov).
 const uint8_t COLLAR_PIN = 6;              // output 3 on the shifter board
 const uint16_t COLLAR_STRIP_PIXELS = 320;  // everything plugged into output 3
-const uint16_t COLLAR_PIXELS = 80;         // the part that is the collar: 50 cm
+const uint16_t COLLAR_PIXELS = 128;        // the part that is the collar: 80 cm
 const float COLLAR_LEVEL = 0.30f;          // the glow at its brightest, 0..1 of the ceiling
 const float COLLAR_ATTACK_MS = 80;         // the glow comes up this fast
 const float COLLAR_RELEASE_MS = 500;       // and falls away this fast
