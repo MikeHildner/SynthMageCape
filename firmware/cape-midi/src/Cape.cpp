@@ -258,7 +258,7 @@ const uint16_t COLLAR_STRIP_PIXELS = 320;  // everything plugged into output 3
 const uint16_t COLLAR_PIXELS = 128;        // the part that is the collar: 80 cm
 const float COLLAR_LEVEL = 0.30f;          // the glow at its brightest, 0..1 of the ceiling
 const float COLLAR_ATTACK_MS = 80;         // the glow comes up this fast
-const float COLLAR_RELEASE_MS = 300;       // and falls away this fast
+const float COLLAR_RELEASE_MS = 150;       // and falls away this fast
 const uint8_t COLLAR_MARK_PIXELS = 4;      // length of the link-state marks, about 2.5 cm
 const uint32_t COLLAR_SWEEP_MS = 400;      // the connected sweep takes this long round the collar
 
@@ -271,10 +271,15 @@ Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the
 // down a staircase of ten visible steps, with each colour channel stepping
 // at a different moment.
 //
-// The cure is dithering: to show 4.25 steps, three pixels in four show 4 and
-// one shows 5, and which pixels are the brighter ones changes every frame.
-// The strip's coating and the tube blend neighbours, and the eye blends
-// frames, so the collar reads as 4.25. That gives four times as many levels.
+// The cure is dithering: to show 4.5 steps, every other pixel shows 4 and the
+// ones between show 5. The strip's coating and the tube blend neighbours, so
+// the collar reads as 4.5. For the quarter steps, a pixel also swaps between
+// its two values on alternate frames, about 50 times a second, too fast to
+// see. Together that gives four times as many levels.
+//
+// The pattern stays where it is: even pixels and odd pixels, nothing more.
+// A first version (19 Nov) moved a four-pixel pattern along the strip every
+// frame, and Mike could see it crawl.
 // FastLED's own dithering is switched off for the collar (see capeBegin), so
 // the two do not fight.
 //
@@ -332,16 +337,15 @@ void drawCollar(uint32_t now) {
   collarGlow.g += (target.g - collarGlow.g) * step;
   collarGlow.b += (target.b - collarGlow.b) * step;
 
-  // Four thresholds, a quarter of a step apart. Neighbouring pixels get
-  // different ones, and every pixel meets all four in four frames. The order
-  // of the shifts (0, 2, 1, 3) keeps the pattern from crawling one way.
-  static const float THRESHOLD[4] = {0.125f, 0.625f, 0.375f, 0.875f};
-  static const uint8_t SHIFT[4] = {0, 2, 1, 3};
+  // Four thresholds, a quarter of a step apart: two for the even pixels and
+  // two for the odd ones, one per frame of a pair. At a half step, the even
+  // pixels are up in one frame and the odd pixels in the other.
+  static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
   static uint8_t frame = 0;
-  frame++;
+  frame ^= 1;
   fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
   for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
-    const float threshold = THRESHOLD[(i + SHIFT[frame & 3]) & 3];
+    const float threshold = THRESHOLD[i & 1][frame];
     collar[i] = CRGB(ditheredChannel(collarGlow.r, threshold), ditheredChannel(collarGlow.g, threshold),
                      ditheredChannel(collarGlow.b, threshold));
   }
