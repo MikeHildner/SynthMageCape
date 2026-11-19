@@ -65,3 +65,7 @@ void capeShow(LinkState state);
 
 // All lights out, now.
 void capeBlank();
+
+// How many frames went out to the LEDs in the last full second. For the
+// status page: the collar's smooth fade needs this near 200.
+uint16_t capeFramesPerSecond();

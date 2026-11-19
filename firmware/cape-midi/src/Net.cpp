@@ -38,9 +38,10 @@ void handleStatus() {
            "bluetooth    %s\n"
            "wifi signal  %d dBm\n"
            "free memory  %lu bytes\n"
-           "brightness   ceiling %u of 255\n",
+           "brightness   ceiling %u of 255\n"
+           "frame rate   %u a second\n",
            BUILD_STAMP, (unsigned long)(millis() / 1000), linkStatusText(), WiFi.RSSI(),
-           (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS);
+           (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS, capeFramesPerSecond());
   server.send(200, "text/plain", page);
 }
 

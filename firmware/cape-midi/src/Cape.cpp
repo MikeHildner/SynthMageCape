@@ -17,7 +17,13 @@ const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 CRGB lapelOne[LEDS_PER_LAPEL];
 CRGB lapelTwo[LEDS_PER_LAPEL];
 
-const uint32_t FRAME_MS = 10;  // 100 frames a second
+// The least time between frames. In practice a frame takes about 8 ms, 125 a
+// second (measured 19 Nov; the status page shows it). Each pixel takes 30
+// millionths of a second to send, and the LED driver sends two strips at a
+// time: the two lapels together (96 pixels, 3 ms), then the collar (128
+// pixels, 4 ms). The collar's smooth fade depends on this rate (see
+// ditheredChannel), so anything that lengthens a frame is worth a second look.
+const uint32_t FRAME_MS = 5;
 
 // ---- ripples
 
@@ -249,8 +255,9 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
 //
 // The strip: 160 pixels a metre, WS2812B, green-red-blue order like the
 // lapels, input at the socket end. On the bench it is still the whole uncut
-// 2 m (320 pixels). The collar is the first COLLAR_PIXELS from the input end;
-// the rest is sent black every frame so it stays dark. On the mock cape the
+// 2 m (320 pixels). The collar is the first COLLAR_PIXELS from the input end.
+// The rest is sent black once, at start-up, and holds that; sending all 320
+// every frame would halve the frame rate. On the mock cape the
 // path is 80 cm: 15 cm up one side of the collar, 50 cm round the top, 15 cm
 // down the other side (measured 19 Nov).
 const uint8_t COLLAR_PIN = 6;              // output 3 on the shifter board
@@ -271,16 +278,19 @@ Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the
 // down a staircase of ten visible steps, with each colour channel stepping
 // at a different moment.
 //
-// The cure is dithering: to show 4.5 steps, every other pixel shows 4 and the
-// ones between show 5. The strip's coating and the tube blend neighbours, so
-// the collar reads as 4.5. That doubles the number of levels.
+// The cure is dithering, in two ways at once. In space: to show 4.5 steps,
+// every other pixel shows 4 and the ones between show 5, and the strip's
+// coating and the tube blend them. In time: for the quarter steps a pixel
+// swaps between its two values on alternate frames, about 60 times a second,
+// and the eye takes the average. Together that is four times as many levels:
+// about 40 where there were 10. The pattern never moves along the strip.
 //
-// The pattern never changes in time: a pixel's value depends only on the
-// level and on whether the pixel is even or odd. Two earlier versions
-// (19 Nov) also swapped pixels from frame to frame to get quarter steps;
-// Mike could see both of them crawl.
-// FastLED's own dithering is switched off for the collar (see capeBegin), so
-// the two do not fight.
+// The frame rate is what makes the swapping invisible. Earlier versions
+// (19 Nov) ran at about 80 frames a second, because all 320 pixels of the
+// uncut strip went out every frame, and Mike could see them shimmer and
+// crawl. A pattern with four frames to its cycle is too slow at any rate this
+// board reaches. FastLED's own dithering is off (see capeBegin), so the two
+// do not fight.
 //
 // One channel of one pixel: `value` is the wanted level, 0-255 before the
 // ceiling; `threshold` (0..1) decides whether this pixel rounds up.
@@ -336,13 +346,14 @@ void drawCollar(uint32_t now) {
   collarGlow.g += (target.g - collarGlow.g) * step;
   collarGlow.b += (target.b - collarGlow.b) * step;
 
-  // Even pixels round up from a quarter of a step, odd pixels from three
-  // quarters. So on the way down, the odd pixels drop a step first and the
-  // even pixels follow half a step later.
-  static const float THRESHOLD[2] = {0.25f, 0.75f};
-  fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
+  // Four thresholds, a quarter of a step apart: two for the even pixels and
+  // two for the odd ones, one per frame of a pair. At a half step, the even
+  // pixels are up in one frame and the odd pixels in the other.
+  static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
+  static uint8_t frame = 0;
+  frame ^= 1;
   for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
-    const float threshold = THRESHOLD[i & 1];
+    const float threshold = THRESHOLD[i & 1][frame];
     collar[i] = CRGB(ditheredChannel(collarGlow.r, threshold), ditheredChannel(collarGlow.g, threshold),
                      ditheredChannel(collarGlow.b, threshold));
   }
@@ -350,7 +361,7 @@ void drawCollar(uint32_t now) {
 
 void collarDark() {
   collarGlow = {0, 0, 0};
-  fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
+  fill_solid(collar, COLLAR_PIXELS, CRGB::Black);
 }
 
 void drawNotes(uint32_t now) {
@@ -429,12 +440,19 @@ void drawNotes(uint32_t now) {
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
-  // The collar does its own dithering (see ditheredChannel).
-  FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS).setDither(DISABLE_DITHER);
+  CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
+  // FastLED's own dithering stays off everywhere. The collar does its own
+  // (see ditheredChannel). The lapels have never had it: FastLED only dithers
+  // at 100 frames a second or more, and the cape ran just under that until
+  // 19 Nov. Switching it off keeps them looking as they did.
+  FastLED.setDither(DISABLE_DITHER);
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
+  // One black frame to everything plugged into output 3, then only the
+  // collar's own pixels from here on. The pixels beyond keep that black.
   FastLED.clear(true);
+  collarStrip.setLeds(collar, COLLAR_PIXELS);
 }
 
 void capeNoteOn(uint8_t note, uint8_t velocity) {
@@ -488,6 +506,14 @@ void capeBend(int bend) {
 
 void capeBlank() { FastLED.clear(true); }
 
+namespace {
+uint16_t framesThisSecond = 0;
+uint16_t framesLastSecond = 0;
+uint32_t secondStartedMs = 0;
+}  // namespace
+
+uint16_t capeFramesPerSecond() { return framesLastSecond; }
+
 void capeAllNotesOff() {
   hueShift = 0;
   memset(heldVelocity, 0, sizeof(heldVelocity));
@@ -536,4 +562,11 @@ void capeShow(LinkState state) {
   }
 
   FastLED.show();
+
+  framesThisSecond++;
+  if (now - secondStartedMs >= 1000) {
+    framesLastSecond = framesThisSecond;
+    framesThisSecond = 0;
+    secondStartedMs = now;
+  }
 }
