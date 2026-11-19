@@ -2,7 +2,7 @@
 //
 // The board scans for a Bluetooth MIDI device (the CME WIDI Master in the
 // Kronos MIDI OUT), connects, and turns what is played into light on the
-// cape's two lapels (see Cape.h). It also prints every message to the serial
+// cape's lapels and collar (see Cape.h). It also prints every message to the serial
 // port (the COM socket, 115200 baud) and keeps the latest for the log page.
 //
 // At home it also joins Wi-Fi, for updates and the log (see Net.h).
@@ -17,6 +17,8 @@
 //     low glow on a row         that key is being held, or was released with
 //                               the sustain pedal down (deeper pedal, brighter)
 //     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
+//     collar glowing            notes are sounding: the colour is their blend,
+//                               the brightness follows the loudest of them
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 

@@ -7,8 +7,8 @@ namespace {
 
 const uint8_t LAPEL_ONE_PIN = 4;
 const uint8_t LAPEL_TWO_PIN = 5;
-// The LED on the ESP32 board itself (GPIO 48) is no longer driven. The chip
-// has four LED outputs, and the cape needs all four: two lapels, two strings.
+// The LED on the ESP32 board itself (GPIO 48) is not driven. The chip has
+// four LED outputs, and the cape will need all four.
 // The hem row of the lapels shows the link state instead.
 
 const uint8_t ROWS = 48;
@@ -16,46 +16,6 @@ const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 
 CRGB lapelOne[LEDS_PER_LAPEL];
 CRGB lapelTwo[LEDS_PER_LAPEL];
-
-// ---- collar strip bench test (temporary)
-//
-// The whole, uncut 2 m collar strip on output 3, to learn three things before
-// anything is cut: that every pixel works, the colour order, and how many
-// pixels the strip has. We do not know the count, so the picture is a ruler
-// drawn over more pixels than the strip can have; the strip shows as much of
-// it as it has pixels, and the rest goes nowhere. The picture never changes,
-// whatever is being played:
-//     pixels 1 to 3 red, 4 to 6 green, 7 to 9 blue   (three of each, because
-//         the strip's coating blends neighbours; judge the middle one)
-//     every pixel after that dim, red and blue by turns   (a dark one is dead)
-//     every 10th pixel a bright mark: white up to pixel 300, green from the
-//         301st on (the 301st, 311th, 321st...)
-// Count: 300, plus 10 for every green mark after the first, plus the dim
-// pixels after the last green mark, plus 1 for that mark itself.
-//
-// First run, 18 Nov, with a 330-pixel ruler and white marks only: the marks
-// ran to the very end of the strip, so the count is near 320 and the ruler
-// was too short to say exactly.
-const uint8_t COLLAR_TEST_PIN = 6;  // output 3 on the shifter board
-// 400 pixels take 12 ms to send, longer than one 10 ms frame, so the whole
-// cape refreshes a little slower while this test is in. Fine for a test.
-const uint16_t COLLAR_TEST_PIXELS = 400;
-const uint16_t COLLAR_TEST_GREEN_FROM = 300;
-CRGB collarTest[COLLAR_TEST_PIXELS];
-
-void drawCollarTest() {
-  for (uint16_t i = 0; i < COLLAR_TEST_PIXELS; i++) {
-    collarTest[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
-  }
-  for (uint16_t i = 10; i < COLLAR_TEST_PIXELS; i += 10) {
-    collarTest[i] = (i < COLLAR_TEST_GREEN_FROM) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
-  }
-  for (uint16_t i = 0; i < 3; i++) {
-    collarTest[i] = CRGB(255, 0, 0);
-    collarTest[3 + i] = CRGB(0, 255, 0);
-    collarTest[6 + i] = CRGB(0, 0, 255);
-  }
-}
 
 const uint32_t FRAME_MS = 10;  // 100 frames a second
 
@@ -275,6 +235,69 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
   }
 }
 
+// ---- the collar
+//
+// The collar does not ripple or sparkle; the lapels are the main event. While
+// notes sound it glows in one even colour, the blend of every note sounding
+// (keys held, and notes the pedal is holding), as bright as the loudest of
+// them. It comes up quickly and falls away slowly. It sits right under the
+// wearer's face, so it is the quietest light on the cape: COLLAR_LEVEL is the
+// most it ever shows, as a fraction of the brightness ceiling.
+//
+// The strip: 160 pixels a metre, WS2812B, green-red-blue order like the
+// lapels, input at the socket end. On the bench it is still the whole uncut
+// 2 m (320 pixels). The collar is the first COLLAR_PIXELS from the input end;
+// the rest is sent black every frame so it stays dark.
+const uint8_t COLLAR_PIN = 6;              // output 3 on the shifter board
+const uint16_t COLLAR_STRIP_PIXELS = 320;  // everything plugged into output 3
+const uint16_t COLLAR_PIXELS = 80;         // the part that is the collar: 50 cm
+const float COLLAR_LEVEL = 0.30f;          // the glow at its brightest, 0..1 of the ceiling
+const float COLLAR_ATTACK_MS = 80;         // the glow comes up this fast
+const float COLLAR_RELEASE_MS = 500;       // and falls away this fast
+
+CRGB collar[COLLAR_STRIP_PIXELS];
+Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the notes' blend
+
+void drawCollar(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  const float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+
+  // Every note sounding has a weight, 0..1: how hard a held key was struck,
+  // or how much of its glow the pedal is still holding.
+  Colour mix = {0, 0, 0};
+  float total = 0;
+  float loudest = 0;
+  for (uint8_t note = 0; note < 128; note++) {
+    float weight = heldVelocity[note] / 127.0f;
+    if (weight == 0 && sustainLevel[note] > 0) {
+      weight = sustainLevel[note] / HELD_GLOW * (pedalDown ? pedalDepth : 1.0f);
+    }
+    if (weight == 0) continue;
+    addColour(mix, colourOfNote(note), weight);
+    total += weight;
+    loudest = fmaxf(loudest, weight);
+  }
+
+  // The target is the notes' average colour, at the loudest note's level.
+  Colour target = {0, 0, 0};
+  if (total > 0) addColour(target, mix, COLLAR_LEVEL * fminf(1.0f, loudest) / total);
+
+  const bool rising = target.r + target.g + target.b > collarGlow.r + collarGlow.g + collarGlow.b;
+  const float step = 1.0f - expf(-elapsed / (rising ? COLLAR_ATTACK_MS : COLLAR_RELEASE_MS));
+  collarGlow.r += (target.r - collarGlow.r) * step;
+  collarGlow.g += (target.g - collarGlow.g) * step;
+  collarGlow.b += (target.b - collarGlow.b) * step;
+
+  fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
+  fill_solid(collar, COLLAR_PIXELS, toLeds(collarGlow));
+}
+
+void collarDark() {
+  collarGlow = {0, 0, 0};
+  fill_solid(collar, COLLAR_STRIP_PIXELS, CRGB::Black);
+}
+
 void drawNotes(uint32_t now) {
   static uint32_t lastDrawMs = now;
   const float elapsed = (float)(now - lastDrawMs);
@@ -351,9 +374,7 @@ void drawNotes(uint32_t now) {
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
-  // The collar strip is sold as WS2812B, so start from the lapels' settings
-  // (green, red, blue). The test shows if the colour order is different.
-  FastLED.addLeds<WS2812B, COLLAR_TEST_PIN, GRB>(collarTest, COLLAR_TEST_PIXELS);
+  FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
   // The two limits. Everything drawn goes through both.
   FastLED.setBrightness(MAX_BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -417,6 +438,7 @@ void capeAllNotesOff() {
   memset(sustainLevel, 0, sizeof(sustainLevel));
   memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
+  collarGlow = {0, 0, 0};
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
 }
@@ -437,8 +459,10 @@ void capeShow(LinkState state) {
     fill_solid(lapelOne, LEDS_PER_LAPEL, CRGB::Black);
     fill_solid(lapelTwo, LEDS_PER_LAPEL, CRGB::Black);
     setRow(0, lit ? CRGB(0, 0, 120) : CRGB::Black);
+    collarDark();
   } else {
     drawNotes(now);
+    drawCollar(now);
 
     // Just connected: one soft green wavefront climbs the lapels, so the
     // wearer can see the link is up without looking at the box.
@@ -450,6 +474,5 @@ void capeShow(LinkState state) {
     }
   }
 
-  drawCollarTest();
   FastLED.show();
 }

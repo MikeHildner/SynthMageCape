@@ -1,11 +1,12 @@
-// The cape's lights: two lapels of 2 x 48 LEDs, plus the board's own LED.
+// The cape's lights: two lapels of 2 x 48 LEDs, and the collar strip.
 //
-// Wiring, the same as the WLED setup, so no lead has to move:
-//     GPIO 4   lapel one (96 LEDs)
-//     GPIO 5   lapel two (96 LEDs)
-//     GPIO 6   output 3: bullet string (for now, a bench test pattern)
-//     GPIO 7   output 4: bullet string (the same test pattern)
-// The LED on the ESP32 board itself is not driven: all four LED outputs are in use.
+// Wiring:
+//     GPIO 4   output 1: lapel one (96 LEDs)
+//     GPIO 5   output 2: lapel two (96 LEDs)
+//     GPIO 6   output 3: the collar strip (on the bench, the whole 2 m)
+//     GPIO 7   output 4: nothing yet
+// The LED on the ESP32 board itself is not driven; the chip's four LED
+// outputs are kept for the cape.
 //
 // Each lapel is one chain of 96: strip one runs up from the plug at the hem to
 // the collar (LEDs 0-47), a U-turn, then strip two runs back down (48-95).
