@@ -266,6 +266,8 @@ const char* linkStatusText() {
 }
 
 void setup() {
+  // Room for a burst of lines, so say() seldom has to skip one (see Net.cpp).
+  Serial.setTxBufferSize(2048);
   Serial.begin(115200);
   delay(300);
   say("\n");

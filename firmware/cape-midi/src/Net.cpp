@@ -29,8 +29,10 @@ size_t logNext = 0;       // where the next character goes
 bool logWrapped = false;  // true once the ring has filled at least once
 portMUX_TYPE logLock = portMUX_INITIALIZER_UNLOCKED;
 
+volatile uint32_t serialSkipped = 0;  // lines not sent to the serial port: it was busy
+
 void handleStatus() {
-  char page[400];
+  char page[560];
   snprintf(page, sizeof(page),
            "Synth Mage cape, MIDI firmware\n"
            "built        %s\n"
@@ -39,9 +41,12 @@ void handleStatus() {
            "wifi signal  %d dBm\n"
            "free memory  %lu bytes\n"
            "brightness   ceiling %u of 255\n"
-           "frame rate   %u a second\n",
+           "frame rate   %u a second\n"
+           "longest gap  %u ms between frames, since this page was last read\n"
+           "serial port  %lu lines skipped because it was busy (they are in /log)\n",
            BUILD_STAMP, (unsigned long)(millis() / 1000), linkStatusText(), WiFi.RSSI(),
-           (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS, capeFramesPerSecond());
+           (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS, capeFramesPerSecond(), capeLongestGapMs(),
+           (unsigned long)serialSkipped);
   server.send(200, "text/plain", page);
 }
 
@@ -101,7 +106,17 @@ void say(const char* format, ...) {
   if (length <= 0) return;
   if ((size_t)length >= sizeof(text)) length = sizeof(text) - 1;
 
-  Serial.write((const uint8_t*)text, length);
+  // The serial port sends about 11,000 characters a second and no faster, and
+  // Serial.write waits when its buffer is full. Moving the joystick sends
+  // several hundred messages a second, a line of 40 characters each, so the
+  // waiting added up to whole frames: the lights froze until the port caught
+  // up (found 20 Nov). So never wait. If the line does not fit in the buffer
+  // right now, the serial port goes without it; the log page still gets it.
+  if (Serial.availableForWrite() >= length) {
+    Serial.write((const uint8_t*)text, length);
+  } else {
+    serialSkipped = serialSkipped + 1;
+  }
 
   portENTER_CRITICAL(&logLock);
   for (int i = 0; i < length; i++) {

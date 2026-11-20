@@ -635,6 +635,16 @@ uint32_t secondStartedMs = 0;
 
 uint16_t capeFramesPerSecond() { return framesLastSecond; }
 
+namespace {
+uint32_t longestGapMs = 0;
+}  // namespace
+
+uint16_t capeLongestGapMs() {
+  const uint32_t gap = longestGapMs;
+  longestGapMs = 0;
+  return gap > 65535 ? 65535 : (uint16_t)gap;
+}
+
 void capeAllNotesOff() {
   bendShift = 0;
   vibratoDepth = 0;
@@ -651,6 +661,7 @@ void capeShow(LinkState state) {
   static uint32_t lastFrameMs = 0;
   const uint32_t now = millis();
   if (now - lastFrameMs < FRAME_MS) return;
+  if (lastFrameMs != 0 && now - lastFrameMs > longestGapMs) longestGapMs = now - lastFrameMs;
   lastFrameMs = now;
 
   if (state == LinkState::Connected && lastState != LinkState::Connected) connectedAtMs = now;

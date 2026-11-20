@@ -74,3 +74,8 @@ void capeBlank();
 // How many frames went out to the LEDs in the last full second. For the
 // status page: the collar's smooth fade needs this near 200.
 uint16_t capeFramesPerSecond();
+
+// The longest time between two frames, in milliseconds, since this was last
+// asked. A frame normally takes about 10; a much larger number means
+// something held the lights up. For the status page.
+uint16_t capeLongestGapMs();
