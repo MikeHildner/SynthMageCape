@@ -14,23 +14,31 @@ const uint8_t LAPEL_TWO_PIN = 5;
 const uint8_t ROWS = 48;
 const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 
-CRGB lapelOne[LEDS_PER_LAPEL];
-CRGB lapelTwo[LEDS_PER_LAPEL];
+// A fairy string of 50 lights can be chained after each lapel: it plugs into
+// the far end of the lapel's second strip, back down at the hem, and takes its
+// data from the lapel's last LED. So each lapel output carries 96 + 50 pixels.
+// With nothing plugged in there, the extra 50 are sent to nobody; no harm.
+const uint8_t STRAND_LIGHTS = 50;
+const uint8_t LAPEL_CHAIN_PIXELS = LEDS_PER_LAPEL + STRAND_LIGHTS;
+
+CRGB lapelOne[LAPEL_CHAIN_PIXELS];
+CRGB lapelTwo[LAPEL_CHAIN_PIXELS];
 
 // The least time between frames. In practice a frame takes about 8 ms, 125 a
 // second (measured 19 Nov; the status page shows it). Each pixel takes 30
 // millionths of a second to send, and the LED driver sends two strips at a
 // time: the two lapels together (96 pixels, 3 ms), then the collar (128
-// pixels, 4 ms). The collar's smooth fade depends on this rate (see
+// pixels, 4 ms). A strand after each lapel makes the first pair 146 pixels,
+// 4.4 ms. The collar's smooth fade depends on this rate (see
 // ditheredChannel), so anything that lengthens a frame is worth a second look.
 const uint32_t FRAME_MS = 5;
 
 // ---- fairy string bench test (temporary)
 //
-// One whole, uncut fairy string on output 4, to learn before anything is cut:
-// which end is the input, that every light works, the colour order, and how
-// many lights a strand has (the listing does not say: 50 or 100). The picture
-// is a ruler longer than the strand can be, and never changes:
+// A ruler for fairy strings. It answered the first questions on output 4
+// (19 Nov: input at the end with the two loose wires, 50 lights, colour order
+// as the strips, two strands chain). Now it also runs on the 50 pixels after
+// each lapel, to prove a strand chained there. The picture never changes:
 //     light 1 red, light 2 green, light 3 blue   (if not, the colour order is wrong)
 //     every light after that dim, red and blue by turns   (a dark one is dead)
 //     every 10th light a bright mark: white, and green from the 101st on
@@ -39,16 +47,22 @@ const uint8_t STRING_TEST_PIN = 7;  // output 4 on the shifter board
 const uint8_t STRING_TEST_PIXELS = 120;
 CRGB stringTest[STRING_TEST_PIXELS];
 
+void drawRuler(CRGB* lights, uint8_t count) {
+  for (uint8_t i = 0; i < count; i++) {
+    lights[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
+  }
+  for (uint8_t i = 10; i < count; i += 10) {
+    lights[i] = (i < 100) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
+  }
+  lights[0] = CRGB(255, 0, 0);
+  lights[1] = CRGB(0, 255, 0);
+  lights[2] = CRGB(0, 0, 255);
+}
+
 void drawStringTest() {
-  for (uint8_t i = 0; i < STRING_TEST_PIXELS; i++) {
-    stringTest[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
-  }
-  for (uint8_t i = 10; i < STRING_TEST_PIXELS; i += 10) {
-    stringTest[i] = (i < 100) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
-  }
-  stringTest[0] = CRGB(255, 0, 0);
-  stringTest[1] = CRGB(0, 255, 0);
-  stringTest[2] = CRGB(0, 0, 255);
+  drawRuler(stringTest, STRING_TEST_PIXELS);
+  drawRuler(lapelOne + LEDS_PER_LAPEL, STRAND_LIGHTS);
+  drawRuler(lapelTwo + LEDS_PER_LAPEL, STRAND_LIGHTS);
 }
 
 // ---- ripples
@@ -464,11 +478,11 @@ void drawNotes(uint32_t now) {
 }  // namespace
 
 void capeBegin() {
-  FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LEDS_PER_LAPEL);
-  FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LEDS_PER_LAPEL);
+  FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LAPEL_CHAIN_PIXELS);
+  FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LAPEL_CHAIN_PIXELS);
   CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
-  // The fairy string is sold as WS2812B. Start from the strips' colour order
-  // (green, red, blue); the test shows if the string's is different.
+  // The fairy strings take the same signal and colour order as the strips
+  // (tested 19 Nov).
   FastLED.addLeds<WS2812B, STRING_TEST_PIN, GRB>(stringTest, STRING_TEST_PIXELS);
   // FastLED's own dithering stays off everywhere. The collar does its own
   // (see ditheredChannel). The lapels have never had it: FastLED only dithers
