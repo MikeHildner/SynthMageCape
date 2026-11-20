@@ -18,6 +18,8 @@
 //     low glow on a row         that key is being held, or was released with
 //                               the sustain pedal down (deeper pedal, brighter)
 //     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
+//     dot running along a       a low note's ripple ran off the bottom of the
+//     string                    lapel; the lower the note, the brighter the dot
 //     collar glowing            notes are sounding: each has its own band of
 //                               the collar, in its colour and at its level
 //     colours swinging          joystick up (controller 1, vibrato): the

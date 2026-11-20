@@ -8,16 +8,20 @@ namespace {
 const uint8_t LAPEL_ONE_PIN = 4;
 const uint8_t LAPEL_TWO_PIN = 5;
 // The LED on the ESP32 board itself (GPIO 48) is not driven. The chip has
-// four LED outputs, and the cape will need all four.
+// four LED outputs, and the cape will need all four. Output 4 (GPIO 7) is
+// not driven yet: it is kept for the shoulders.
 // The hem row of the lapels shows the link state instead.
 
 const uint8_t ROWS = 48;
 const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 
-// A fairy string of 50 lights can be chained after each lapel: it plugs into
-// the far end of the lapel's second strip, back down at the hem, and takes its
-// data from the lapel's last LED. So each lapel output carries 96 + 50 pixels.
-// With nothing plugged in there, the extra 50 are sent to nobody; no harm.
+// A fairy string of 50 lights is chained after each lapel: it plugs into the
+// far end of the lapel's second strip, back down at the hem, and takes its
+// data from the lapel's last LED (soldered and proven 20 Nov). So each lapel
+// output carries 96 + 50 pixels. The string's input is the end with the two
+// loose wires; its lights are 10 cm apart and take the same signal and
+// colour order as the strips. The ruler that tested all this is in git
+// history (drawRuler, commit a5a623f and before).
 const uint8_t STRAND_LIGHTS = 50;
 const uint8_t LAPEL_CHAIN_PIXELS = LEDS_PER_LAPEL + STRAND_LIGHTS;
 
@@ -27,43 +31,11 @@ CRGB lapelTwo[LAPEL_CHAIN_PIXELS];
 // The least time between frames. In practice a frame takes about 8 ms, 125 a
 // second (measured 19 Nov; the status page shows it). Each pixel takes 30
 // millionths of a second to send, and the LED driver sends two strips at a
-// time: the two lapels together (96 pixels, 3 ms), then the collar (128
-// pixels, 4 ms). A strand after each lapel makes the first pair 146 pixels,
-// 4.4 ms. The collar's smooth fade depends on this rate (see
+// time: the two lapels with their strings together (146 pixels, 4.4 ms),
+// then the collar (128 pixels, 4 ms). The collar's smooth fade depends on
+// this rate (see
 // ditheredChannel), so anything that lengthens a frame is worth a second look.
 const uint32_t FRAME_MS = 5;
-
-// ---- fairy string bench test (temporary)
-//
-// A ruler for fairy strings. It answered the first questions on output 4
-// (19 Nov: input at the end with the two loose wires, 50 lights, colour order
-// as the strips, two strands chain). Now it also runs on the 50 pixels after
-// each lapel, to prove a strand chained there. The picture never changes:
-//     light 1 red, light 2 green, light 3 blue   (if not, the colour order is wrong)
-//     every light after that dim, red and blue by turns   (a dark one is dead)
-//     every 10th light a bright mark: white, and green from the 101st on
-// Count: 10 for every mark, plus the dim lights after the last mark, plus 1.
-const uint8_t STRING_TEST_PIN = 7;  // output 4 on the shifter board
-const uint8_t STRING_TEST_PIXELS = 120;
-CRGB stringTest[STRING_TEST_PIXELS];
-
-void drawRuler(CRGB* lights, uint8_t count) {
-  for (uint8_t i = 0; i < count; i++) {
-    lights[i] = (i % 2 == 0) ? CRGB(90, 0, 0) : CRGB(0, 0, 90);
-  }
-  for (uint8_t i = 10; i < count; i += 10) {
-    lights[i] = (i < 100) ? CRGB(255, 255, 255) : CRGB(0, 255, 0);
-  }
-  lights[0] = CRGB(255, 0, 0);
-  lights[1] = CRGB(0, 255, 0);
-  lights[2] = CRGB(0, 0, 255);
-}
-
-void drawStringTest() {
-  drawRuler(stringTest, STRING_TEST_PIXELS);
-  drawRuler(lapelOne + LEDS_PER_LAPEL, STRAND_LIGHTS);
-  drawRuler(lapelTwo + LEDS_PER_LAPEL, STRAND_LIGHTS);
-}
 
 // ---- ripples
 
@@ -481,6 +453,87 @@ void collarDark() {
   fill_solid(collar, COLLAR_PIXELS, CRGB::Black);
 }
 
+// ---- the strings below the lapels
+//
+// A struck key sends a wavefront down the lapel. When it reaches the bottom
+// it runs off into the string: one dot of the note's colour travels along
+// the string's lights, away from the lapel, fading as it goes. It starts as
+// bright as the wavefront was when it left the lapel, so low notes, which
+// start near the bottom, send bright dots; a note from the middle of the
+// keyboard sends a faint one; and the ripple of a high note dies on the lapel
+// and sends none. Both strings show the same. With nothing played they are
+// dark.
+//
+// Light 0 is the one next to the lapel. For now a dot may travel along the
+// whole string; which lights are the unlit crossing above the hem is decided
+// when the strings are placed on the cape.
+const float RUNNER_LIFE_MS = 1500;          // how long a dot lasts
+const float RUNNER_LIGHTS_PER_MS = 0.012f;  // how fast it travels: 12 lights, 1.2 m, a second
+const float RUNNER_WIDTH_LIGHTS = 1.0f;     // 1 = passed smoothly from each light to the next
+
+struct Runner {
+  bool active;
+  uint8_t note;      // decides the colour
+  float strength;    // 0..1 as it leaves the lapel
+  uint32_t startMs;  // when it leaves the lapel; in the future while the wavefront is still on its way
+};
+Runner runners[16];
+
+// A key was struck at `row` with `strength`: book the dot that its downward
+// wavefront becomes.
+void launchRunner(uint8_t note, float row, float strength, uint32_t struckMs) {
+  const float travelMs = row / RIPPLE_ROWS_PER_MS;  // the wavefront's time to the lapel bottom
+  if (travelMs >= RIPPLE_LIFE_MS) return;           // it dies on the lapel
+  const float remaining = 1.0f - travelMs / RIPPLE_LIFE_MS;
+
+  // Reuse a finished runner, or failing that the oldest one.
+  Runner* slot = &runners[0];
+  for (Runner& runner : runners) {
+    if (!runner.active) {
+      slot = &runner;
+      break;
+    }
+    if ((int32_t)(runner.startMs - slot->startMs) < 0) slot = &runner;
+  }
+  slot->active = true;
+  slot->note = note;
+  slot->strength = strength * remaining * remaining;  // the ripple's own fade
+  slot->startMs = struckMs + (uint32_t)travelMs;
+}
+
+void strandsDark() {
+  fill_solid(lapelOne + LEDS_PER_LAPEL, STRAND_LIGHTS, CRGB::Black);
+  fill_solid(lapelTwo + LEDS_PER_LAPEL, STRAND_LIGHTS, CRGB::Black);
+}
+
+void drawStrands(uint32_t now) {
+  Colour lights[STRAND_LIGHTS] = {};
+  for (Runner& runner : runners) {
+    if (!runner.active) continue;
+    const int32_t age = (int32_t)(now - runner.startMs);
+    if (age < 0) continue;  // its wavefront is still on the lapel
+    if (age >= RUNNER_LIFE_MS) {
+      runner.active = false;
+      continue;
+    }
+    const float remaining = 1.0f - age / RUNNER_LIFE_MS;
+    const float level = runner.strength * remaining * remaining;
+    const float position = age * RUNNER_LIGHTS_PER_MS;
+    const Colour colour = colourOfNote(runner.note);
+    for (uint8_t light = 0; light < STRAND_LIGHTS; light++) {
+      const float distance = fabsf((float)light - position);
+      if (distance < RUNNER_WIDTH_LIGHTS) {
+        addColour(lights[light], colour, level * (1.0f - distance / RUNNER_WIDTH_LIGHTS));
+      }
+    }
+  }
+  for (uint8_t light = 0; light < STRAND_LIGHTS; light++) {
+    const CRGB colour = toLeds(lights[light]);
+    lapelOne[LEDS_PER_LAPEL + light] = colour;
+    lapelTwo[LEDS_PER_LAPEL + light] = colour;
+  }
+}
+
 void drawNotes(uint32_t now) {
   static uint32_t lastDrawMs = now;
   const float elapsed = (float)(now - lastDrawMs);
@@ -558,9 +611,6 @@ void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LAPEL_CHAIN_PIXELS);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LAPEL_CHAIN_PIXELS);
   CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
-  // The fairy strings take the same signal and colour order as the strips
-  // (tested 19 Nov).
-  FastLED.addLeds<WS2812B, STRING_TEST_PIN, GRB>(stringTest, STRING_TEST_PIXELS);
   // FastLED's own dithering stays off everywhere. The collar does its own
   // (see ditheredChannel). The lapels have never had it: FastLED only dithers
   // at 100 frames a second or more, and the cape ran just under that until
@@ -595,6 +645,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
   slot->row = rowOfNote(note);
   slot->strength = velocity / 127.0f;
   slot->startMs = millis();
+  launchRunner(note, slot->row, slot->strength, slot->startMs);
 }
 
 void capeNoteOff(uint8_t note) {
@@ -655,6 +706,7 @@ void capeAllNotesOff() {
   memset(collarNow, 0, sizeof(collarNow));
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
+  for (Runner& runner : runners) runner.active = false;
 }
 
 void capeShow(LinkState state) {
@@ -673,12 +725,14 @@ void capeShow(LinkState state) {
     const bool lit = state == LinkState::Connecting || (now / 500) % 2;
     fill_solid(lapelOne, LEDS_PER_LAPEL, CRGB::Black);
     fill_solid(lapelTwo, LEDS_PER_LAPEL, CRGB::Black);
+    strandsDark();
     setRow(0, lit ? CRGB(0, 0, 120) : CRGB::Black);
     collarDark();
     if (lit) collarMarks(0, CRGB(0, 0, 120));
   } else {
     updateHueShift(now);
     drawNotes(now);
+    drawStrands(now);
     drawCollar(now);
 
     // Just connected: one soft green wavefront climbs the lapels, so the
@@ -695,7 +749,6 @@ void capeShow(LinkState state) {
     }
   }
 
-  drawStringTest();
   FastLED.show();
 
   framesThisSecond++;

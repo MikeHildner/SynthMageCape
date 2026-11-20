@@ -1,10 +1,11 @@
-// The cape's lights: two lapels of 2 x 48 LEDs, and the collar strip.
+// The cape's lights: two lapels of 2 x 48 LEDs, a string of 50 small lights
+// after each lapel, and the collar strip.
 //
 // Wiring:
-//     GPIO 4   output 1: lapel one (96 LEDs)
-//     GPIO 5   output 2: lapel two (96 LEDs)
+//     GPIO 4   output 1: lapel one (96 LEDs), then its string (50 lights)
+//     GPIO 5   output 2: lapel two (96 LEDs), then its string (50 lights)
 //     GPIO 6   output 3: the collar strip (on the bench, the whole 2 m)
-//     GPIO 7   output 4: a fairy string of 50 lights, on test (drawStringTest)
+//     GPIO 7   output 4: not driven yet; kept for the shoulders
 // The LED on the ESP32 board itself is not driven; the chip's four LED
 // outputs are kept for the cape.
 //
