@@ -20,6 +20,8 @@
 //     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
 //     collar glowing            notes are sounding: each has its own band of
 //                               the collar, in its colour and at its level
+//     colours swinging          joystick up (controller 1, vibrato): the
+//                               further up, the wider the swing
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
@@ -307,6 +309,8 @@ void loop() {
       capeNoteOff(message.data1);
     } else if (message.type() == 0xB0 && message.data1 == 64) {  // sustain pedal
       capePedal(message.data2);
+    } else if (message.type() == 0xB0 && message.data1 == 1) {  // mod wheel: joystick up, vibrato
+      capeModulation(message.data2);
     } else if (message.type() == 0xE0) {  // pitch bend: 14 bits, centred on 8192
       capeBend(((message.data2 << 7) | message.data1) - 8192);
     }

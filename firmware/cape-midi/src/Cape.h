@@ -60,6 +60,11 @@ void capePedal(uint8_t value);
 // everything that is lit, by up to three eighths of a turn either way.
 void capeBend(int bend);
 
+// The mod wheel moved (controller 1, 0-127; joystick up on the Kronos, which
+// adds vibrato). The colour of everything that is lit swings to and fro,
+// six times a second, wider the further the joystick is pushed.
+void capeModulation(uint8_t value);
+
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.
 void capeShow(LinkState state);
 

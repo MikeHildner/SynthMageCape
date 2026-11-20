@@ -136,7 +136,36 @@ const float COLOUR_GAIN = 1.42f;      // Warm look: brings that colour up to ful
 const uint8_t NOTE_HUE_OF_C = 0;      // NoteNames look: C is red
 const float BEND_HUE_RANGE = 96;      // how far full bend turns the wheel, either way
 
-uint8_t hueShift = 0;  // from pitch bend; added to every hue, wrapping round the wheel
+// ---- vibrato
+//
+// Joystick up sends controller 1 (the mod wheel), which on most programs adds
+// vibrato: the pitch wobbles a little, several times a second. The lights do
+// the same with colour. Everything that is lit swings to and fro round its
+// own colour, VIBRATO_HZ times a second, and the further the joystick is
+// pushed the wider the swing. Brightness is not touched.
+const float VIBRATO_HUE_RANGE = 32;  // the swing either way at full joystick: an eighth of a turn
+const float VIBRATO_HZ = 6;          // swings a second
+
+float bendShift = 0;     // from pitch bend, in hue steps (256 to a turn)
+float vibratoDepth = 0;  // 0..1, from controller 1
+float vibratoNow = 0;    // where the swing is in this frame, in hue steps
+uint8_t steadyShift = 0; // pitch bend only: the hue shift without the swing
+uint8_t hueShift = 0;    // pitch bend plus the swing; added to every hue, wrapping round the wheel
+
+// Works out this frame's hue shift. Call once a frame, before drawing.
+void updateHueShift(uint32_t now) {
+  static uint32_t lastMs = now;
+  static float phase = 0;  // 0..1, one swing
+  phase += (float)(now - lastMs) * VIBRATO_HZ / 1000.0f;
+  phase -= floorf(phase);
+  lastMs = now;
+
+  vibratoNow = sinf(TWO_PI * phase) * vibratoDepth * VIBRATO_HUE_RANGE;
+  // Turning the result into a uint8_t wraps a turn to the left (negative)
+  // round the colour wheel.
+  steadyShift = (uint8_t)(int)lroundf(bendShift);
+  hueShift = (uint8_t)(int)lroundf(bendShift + vibratoNow);
+}
 
 // A colour in red, green and blue, 0-255 each, kept as fractions while several
 // lights are being mixed. It may run past 255 on the way; toLeds() limits it.
@@ -144,8 +173,8 @@ struct Colour {
   float r, g, b;
 };
 
-// The colour of a note at full level.
-Colour colourOfNote(uint8_t note) {
+// The colour of a note at full level. `shift` turns it round the wheel.
+Colour colourOfNote(uint8_t note, uint8_t shift) {
   uint8_t hue = BASE_HUE;
   uint8_t saturation = BASE_SATURATION;
   float gain = COLOUR_GAIN;
@@ -154,9 +183,12 @@ Colour colourOfNote(uint8_t note) {
     saturation = 255;
     gain = 1;
   }
-  const CRGB full = CHSV((uint8_t)(hue + hueShift), saturation, 255);
+  const CRGB full = CHSV((uint8_t)(hue + shift), saturation, 255);
   return {full.r * gain, full.g * gain, full.b * gain};
 }
+
+// ...with this frame's pitch bend and vibrato swing.
+Colour colourOfNote(uint8_t note) { return colourOfNote(note, hueShift); }
 
 // Adds `amount` (0..1) of a colour to what is there.
 void addColour(Colour& to, const Colour& colour, float amount) {
@@ -391,8 +423,20 @@ void drawCollar(uint32_t now) {
   Colour bands[COLLAR_HALF];
   for (uint8_t band = 0; band < count; band++) {
     bands[band] = {0, 0, 0};
-    addColour(bands[band], colourOfNote(notes[band]), COLLAR_LEVEL * weights[band]);
+    addColour(bands[band], colourOfNote(notes[band], steadyShift), COLLAR_LEVEL * weights[band]);
   }
+
+  // The vibrato swing. The fading below is too slow to follow six swings a
+  // second (it would smooth them away), so the bands are worked out without
+  // the swing and each pixel's colour is turned afterwards. Turning a colour
+  // is a rotation about the grey line (red = green = blue), which keeps red +
+  // green + blue the same. These are that rotation's three numbers.
+  const float angle = vibratoNow * TWO_PI / 256.0f;
+  const float third = (1.0f - cosf(angle)) / 3.0f;
+  const float lean = sinf(angle) * 0.57735f;  // 1 / square root of 3
+  const float keepPart = cosf(angle) + third;
+  const float fromPrevious = third + lean;  // red into green, green into blue, blue into red
+  const float fromNext = third - lean;
 
   // Four thresholds, a quarter of a step apart: two for the even pixels and
   // two for the odd ones, one per frame of a pair. At a half step, the even
@@ -414,12 +458,20 @@ void drawCollar(uint32_t now) {
     shown.g += (target.g - shown.g) * step;
     shown.b += (target.b - shown.b) * step;
 
+    // Turned by the vibrato swing. A pure colour can come out a little below
+    // zero in one channel; that is limited to zero.
+    const Colour turned = {
+        fmaxf(0.0f, shown.r * keepPart + shown.g * fromNext + shown.b * fromPrevious),
+        fmaxf(0.0f, shown.g * keepPart + shown.b * fromNext + shown.r * fromPrevious),
+        fmaxf(0.0f, shown.b * keepPart + shown.r * fromNext + shown.g * fromPrevious),
+    };
+
     // The pixel on this side, and its mirror image on the other.
     const uint16_t pixels[2] = {i, (uint16_t)(COLLAR_PIXELS - 1 - i)};
     for (const uint16_t pixel : pixels) {
       const float threshold = THRESHOLD[pixel & 1][frame];
-      collar[pixel] = CRGB(ditheredChannel(shown.r, threshold), ditheredChannel(shown.g, threshold),
-                           ditheredChannel(shown.b, threshold));
+      collar[pixel] = CRGB(ditheredChannel(turned.r, threshold), ditheredChannel(turned.g, threshold),
+                           ditheredChannel(turned.b, threshold));
     }
   }
 }
@@ -567,10 +619,11 @@ void capePedal(uint8_t value) {
 }
 
 void capeBend(int bend) {
-  // bend is -8192..8191. Turning the result into a uint8_t wraps a turn to
-  // the left (negative) round the colour wheel.
-  hueShift = (uint8_t)(int)lroundf(bend * BEND_HUE_RANGE / 8192.0f);
+  // bend is -8192..8191. updateHueShift() adds the vibrato swing.
+  bendShift = bend * BEND_HUE_RANGE / 8192.0f;
 }
+
+void capeModulation(uint8_t value) { vibratoDepth = (value > 127 ? 127 : value) / 127.0f; }
 
 void capeBlank() { FastLED.clear(true); }
 
@@ -583,7 +636,8 @@ uint32_t secondStartedMs = 0;
 uint16_t capeFramesPerSecond() { return framesLastSecond; }
 
 void capeAllNotesOff() {
-  hueShift = 0;
+  bendShift = 0;
+  vibratoDepth = 0;
   memset(heldVelocity, 0, sizeof(heldVelocity));
   memset(sustainLevel, 0, sizeof(sustainLevel));
   memset(organLevel, 0, sizeof(organLevel));
@@ -612,6 +666,7 @@ void capeShow(LinkState state) {
     collarDark();
     if (lit) collarMarks(0, CRGB(0, 0, 120));
   } else {
+    updateHueShift(now);
     drawNotes(now);
     drawCollar(now);
 
