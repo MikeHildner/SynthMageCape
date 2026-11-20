@@ -284,9 +284,16 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
 // ---- the collar
 //
 // The collar does not ripple or sparkle; the lapels are the main event. While
-// notes sound it glows in one even colour, the blend of every note sounding
-// (keys held, and notes the pedal is holding), as bright as the loudest of
-// them. It comes up quickly and falls away slowly. While the cape is looking
+// notes sound it glows, and every note sounding (keys held, and notes the
+// pedal is holding) has its own band of the collar in its own colour, as
+// bright as that note. One note has the whole collar. A chord divides it:
+// each half of the collar is shared out equally, the lowest note at the
+// collar bottom next to the lapel top, the highest at the back of the neck,
+// so the two sides mirror each other. (Until 19 Nov a chord showed the
+// average of its colours, which went pale: red, yellow-green and blue
+// average out near white.) When notes come and go the bands re-divide, and
+// every pixel fades to its new colour instead of jumping.
+// It comes up quickly and falls away slowly. While the cape is looking
 // for the keyboard, a short mark at each collar bottom blinks with the hem
 // row, and the green sweep that says "connected" carries on from the lapel
 // tops round the collar to meet at the back. It sits right under the
@@ -310,7 +317,11 @@ const uint8_t COLLAR_MARK_PIXELS = 4;      // length of the link-state marks, ab
 const uint32_t COLLAR_SWEEP_MS = 400;      // the connected sweep takes this long round the collar
 
 CRGB collar[COLLAR_STRIP_PIXELS];
-Colour collarGlow = {0, 0, 0};  // what the collar shows now, moving towards the notes' blend
+// What one side of the collar shows now, pixel by pixel from the collar bottom
+// to the back of the neck, each moving towards its band's colour. The other
+// side is the mirror image.
+const uint16_t COLLAR_HALF = COLLAR_PIXELS / 2;
+Colour collarNow[COLLAR_HALF] = {};
 
 // Why the collar needs help to fade smoothly. An LED takes whole numbers,
 // 0-255, and the brightness ceiling scales everything down to 0-32. The
@@ -360,31 +371,28 @@ void drawCollar(uint32_t now) {
   const float elapsed = (float)(now - lastDrawMs);
   lastDrawMs = now;
 
-  // Every note sounding has a weight, 0..1: how hard a held key was struck,
-  // or how much of its glow the pedal is still holding.
-  Colour mix = {0, 0, 0};
-  float total = 0;
-  float loudest = 0;
-  for (uint8_t note = 0; note < 128; note++) {
+  // The notes sounding, lowest first, each with a weight, 0..1: how hard a
+  // held key was struck, or how much of its glow the pedal is still holding.
+  uint8_t notes[COLLAR_HALF];
+  float weights[COLLAR_HALF];
+  uint8_t count = 0;
+  for (uint8_t note = 0; note < 128 && count < COLLAR_HALF; note++) {
     float weight = heldVelocity[note] / 127.0f;
     if (weight == 0 && sustainLevel[note] > 0) {
       weight = sustainLevel[note] / HELD_GLOW * (pedalDown ? pedalDepth : 1.0f);
     }
     if (weight == 0) continue;
-    addColour(mix, colourOfNote(note), weight);
-    total += weight;
-    loudest = fmaxf(loudest, weight);
+    notes[count] = note;
+    weights[count] = fminf(1.0f, weight);
+    count++;
   }
 
-  // The target is the notes' average colour, at the loudest note's level.
-  Colour target = {0, 0, 0};
-  if (total > 0) addColour(target, mix, COLLAR_LEVEL * fminf(1.0f, loudest) / total);
-
-  const bool rising = target.r + target.g + target.b > collarGlow.r + collarGlow.g + collarGlow.b;
-  const float step = 1.0f - expf(-elapsed / (rising ? COLLAR_ATTACK_MS : COLLAR_RELEASE_MS));
-  collarGlow.r += (target.r - collarGlow.r) * step;
-  collarGlow.g += (target.g - collarGlow.g) * step;
-  collarGlow.b += (target.b - collarGlow.b) * step;
+  // Each band's colour at its note's level.
+  Colour bands[COLLAR_HALF];
+  for (uint8_t band = 0; band < count; band++) {
+    bands[band] = {0, 0, 0};
+    addColour(bands[band], colourOfNote(notes[band]), COLLAR_LEVEL * weights[band]);
+  }
 
   // Four thresholds, a quarter of a step apart: two for the even pixels and
   // two for the odd ones, one per frame of a pair. At a half step, the even
@@ -392,15 +400,32 @@ void drawCollar(uint32_t now) {
   static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
   static uint8_t frame = 0;
   frame ^= 1;
-  for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
-    const float threshold = THRESHOLD[i & 1][frame];
-    collar[i] = CRGB(ditheredChannel(collarGlow.r, threshold), ditheredChannel(collarGlow.g, threshold),
-                     ditheredChannel(collarGlow.b, threshold));
+
+  const float attack = 1.0f - expf(-elapsed / COLLAR_ATTACK_MS);
+  const float release = 1.0f - expf(-elapsed / COLLAR_RELEASE_MS);
+  const Colour dark = {0, 0, 0};
+  for (uint16_t i = 0; i < COLLAR_HALF; i++) {
+    // Which band this pixel is in, and so the colour it is heading for.
+    const Colour& target = count == 0 ? dark : bands[i * count / COLLAR_HALF];
+    Colour& shown = collarNow[i];
+    const bool rising = target.r + target.g + target.b > shown.r + shown.g + shown.b;
+    const float step = rising ? attack : release;
+    shown.r += (target.r - shown.r) * step;
+    shown.g += (target.g - shown.g) * step;
+    shown.b += (target.b - shown.b) * step;
+
+    // The pixel on this side, and its mirror image on the other.
+    const uint16_t pixels[2] = {i, (uint16_t)(COLLAR_PIXELS - 1 - i)};
+    for (const uint16_t pixel : pixels) {
+      const float threshold = THRESHOLD[pixel & 1][frame];
+      collar[pixel] = CRGB(ditheredChannel(shown.r, threshold), ditheredChannel(shown.g, threshold),
+                           ditheredChannel(shown.b, threshold));
+    }
   }
 }
 
 void collarDark() {
-  collarGlow = {0, 0, 0};
+  memset(collarNow, 0, sizeof(collarNow));
   fill_solid(collar, COLLAR_PIXELS, CRGB::Black);
 }
 
@@ -563,7 +588,7 @@ void capeAllNotesOff() {
   memset(sustainLevel, 0, sizeof(sustainLevel));
   memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
-  collarGlow = {0, 0, 0};
+  memset(collarNow, 0, sizeof(collarNow));
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
 }

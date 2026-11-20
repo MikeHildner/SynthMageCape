@@ -18,8 +18,8 @@
 //     low glow on a row         that key is being held, or was released with
 //                               the sustain pedal down (deeper pedal, brighter)
 //     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
-//     collar glowing            notes are sounding: the colour is their blend,
-//                               the brightness follows the loudest of them
+//     collar glowing            notes are sounding: each has its own band of
+//                               the collar, in its colour and at its level
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
