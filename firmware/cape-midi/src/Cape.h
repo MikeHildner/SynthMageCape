@@ -5,7 +5,7 @@
 //     GPIO 4   output 1: lapel one (96 LEDs), then its string (50 lights)
 //     GPIO 5   output 2: lapel two (96 LEDs), then its string (50 lights)
 //     GPIO 6   output 3: the collar strip (on the bench, the whole 2 m)
-//     GPIO 7   output 4: the two shoulders, 12 LEDs each, chained (on test: a ruler)
+//     GPIO 7   output 4: the two shoulders, 2 x 12 LEDs each, chained (on test: a ruler)
 // The LED on the ESP32 board itself is not driven; the chip's four LED
 // outputs are kept for the cape.
 //

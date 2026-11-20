@@ -28,12 +28,14 @@ const uint8_t LAPEL_CHAIN_PIXELS = LEDS_PER_LAPEL + STRAND_LIGHTS;
 CRGB lapelOne[LAPEL_CHAIN_PIXELS];
 CRGB lapelTwo[LAPEL_CHAIN_PIXELS];
 
-// The least time between frames. In practice a frame takes about 8 ms, 125 a
-// second (measured 19 Nov; the status page shows it). Each pixel takes 30
-// millionths of a second to send, and the LED driver sends two strips at a
-// time: the two lapels with their strings together (146 pixels, 4.4 ms),
-// then the collar (128 pixels, 4 ms) with the shoulders (24 pixels) beside
-// it. The collar's smooth fade depends on this rate (see
+// The least time between frames. Each pixel takes 30 millionths of a second
+// to send, and the LED driver sends two strips at a time: the two lapels
+// with their strings together (146 pixels, 4.4 ms), then the collar (128
+// pixels, 4 ms). Measured on the status page: 125 frames a second with
+// lapels and collar (19 Nov), 111 with the strings, 108 with 24 shoulder
+// pixels on the fourth output and 102 with 48 (20 Nov). So the shoulders do
+// cost time, though they are sent beside the collar; why is not yet looked
+// into. The collar's smooth fade depends on this rate (see
 // ditheredChannel), so anything that lengthens a frame is worth a second look.
 const uint32_t FRAME_MS = 5;
 
@@ -630,18 +632,24 @@ void drawNotes(uint32_t now) {
 
 // ---- the shoulders (bench test, temporary)
 //
-// Two short pieces of the lapel strip, 12 LEDs each, one on each shoulder,
-// chained on output 4: the cable from the board reaches shoulder one at its
-// neck end, and a link behind the neck carries on to shoulder two.
+// Epaulettes: on each shoulder two rows of 12 LEDs of the lapel strip, side by
+// side, built like a short lapel. Row one runs from the neck out to the
+// shoulder edge (LEDs 1-12), a U-turn, then row two runs back to the neck
+// (13-24). Both shoulders are chained on output 4: the cable from the board
+// reaches shoulder one at its neck end, and a short link behind the neck
+// carries on from the end of its row two to shoulder two.
 //
 // For now they show a ruler, the same on each shoulder, always on, whether or
 // not the Kronos is connected:
-//     LED 1 red, 2 green, 3 blue    the start, and the colour order
-//     LEDs 4 to 11 dim blue         the middle
-//     LED 12 white                  the end
+//     LED 1 red, 2 green, 3 blue    the start of row one, and the colour order
+//     LEDs 4 to 11 dim blue
+//     LEDs 12 and 13 white          either side of the U-turn, at the shoulder edge
+//     LEDs 14 to 23 dim blue
+//     LED 24 yellow                 the end of row two, back at the neck beside the red
 // A whole ruler on a shoulder means its wiring and its count are right.
 const uint8_t SHOULDER_PIN = 7;  // output 4 on the shifter board
-const uint8_t LEDS_PER_SHOULDER = 12;
+const uint8_t SHOULDER_ROWS = 12;
+const uint8_t LEDS_PER_SHOULDER = 2 * SHOULDER_ROWS;
 const uint8_t SHOULDER_PIXELS = 2 * LEDS_PER_SHOULDER;
 CRGB shoulders[SHOULDER_PIXELS];
 
@@ -652,7 +660,9 @@ void drawShoulderRuler() {
     leds[0] = CRGB(120, 0, 0);
     leds[1] = CRGB(0, 120, 0);
     leds[2] = CRGB(0, 0, 120);
-    leds[LEDS_PER_SHOULDER - 1] = CRGB(80, 80, 80);
+    leds[SHOULDER_ROWS - 1] = CRGB(80, 80, 80);
+    leds[SHOULDER_ROWS] = CRGB(80, 80, 80);
+    leds[LEDS_PER_SHOULDER - 1] = CRGB(110, 80, 0);
   }
 }
 
