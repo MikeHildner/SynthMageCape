@@ -8,8 +8,8 @@ namespace {
 const uint8_t LAPEL_ONE_PIN = 4;
 const uint8_t LAPEL_TWO_PIN = 5;
 // The LED on the ESP32 board itself (GPIO 48) is not driven. The chip has
-// four LED outputs, and the cape will need all four. Output 4 (GPIO 7) is
-// not driven yet: it is kept for the shoulders.
+// four LED outputs, and the cape uses all four. Output 4 (GPIO 7) carries
+// the shoulders (see drawShoulderRuler).
 // The hem row of the lapels shows the link state instead.
 
 const uint8_t ROWS = 48;
@@ -32,8 +32,8 @@ CRGB lapelTwo[LAPEL_CHAIN_PIXELS];
 // second (measured 19 Nov; the status page shows it). Each pixel takes 30
 // millionths of a second to send, and the LED driver sends two strips at a
 // time: the two lapels with their strings together (146 pixels, 4.4 ms),
-// then the collar (128 pixels, 4 ms). The collar's smooth fade depends on
-// this rate (see
+// then the collar (128 pixels, 4 ms) with the shoulders (24 pixels) beside
+// it. The collar's smooth fade depends on this rate (see
 // ditheredChannel), so anything that lengthens a frame is worth a second look.
 const uint32_t FRAME_MS = 5;
 
@@ -628,12 +628,41 @@ void drawNotes(uint32_t now) {
   drawSparkle(notesSounding, elapsed);
 }
 
+// ---- the shoulders (bench test, temporary)
+//
+// Two short pieces of the lapel strip, 12 LEDs each, one on each shoulder,
+// chained on output 4: the cable from the board reaches shoulder one at its
+// neck end, and a link behind the neck carries on to shoulder two.
+//
+// For now they show a ruler, the same on each shoulder, always on, whether or
+// not the Kronos is connected:
+//     LED 1 red, 2 green, 3 blue    the start, and the colour order
+//     LEDs 4 to 11 dim blue         the middle
+//     LED 12 white                  the end
+// A whole ruler on a shoulder means its wiring and its count are right.
+const uint8_t SHOULDER_PIN = 7;  // output 4 on the shifter board
+const uint8_t LEDS_PER_SHOULDER = 12;
+const uint8_t SHOULDER_PIXELS = 2 * LEDS_PER_SHOULDER;
+CRGB shoulders[SHOULDER_PIXELS];
+
+void drawShoulderRuler() {
+  for (uint8_t shoulder = 0; shoulder < 2; shoulder++) {
+    CRGB* leds = shoulders + shoulder * LEDS_PER_SHOULDER;
+    fill_solid(leds, LEDS_PER_SHOULDER, CRGB(0, 0, 40));
+    leds[0] = CRGB(120, 0, 0);
+    leds[1] = CRGB(0, 120, 0);
+    leds[2] = CRGB(0, 0, 120);
+    leds[LEDS_PER_SHOULDER - 1] = CRGB(80, 80, 80);
+  }
+}
+
 }  // namespace
 
 void capeBegin() {
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LAPEL_CHAIN_PIXELS);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LAPEL_CHAIN_PIXELS);
   CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
+  FastLED.addLeds<WS2812B, SHOULDER_PIN, GRB>(shoulders, SHOULDER_PIXELS);
   // FastLED's own dithering stays off everywhere. The collar does its own
   // (see ditheredChannel). The lapels have never had it: FastLED only dithers
   // at 100 frames a second or more, and the cape ran just under that until
@@ -772,6 +801,7 @@ void capeShow(LinkState state) {
     }
   }
 
+  drawShoulderRuler();
   FastLED.show();
 
   framesThisSecond++;
