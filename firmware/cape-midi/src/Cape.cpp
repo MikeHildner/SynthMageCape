@@ -464,10 +464,29 @@ void collarDark() {
 // and sends none. Both strings show the same. With nothing played they are
 // dark.
 //
-// Light 0 is the one next to the lapel. For now a dot may travel along the
-// whole string; which lights are the unlit crossing above the hem is decided
-// when the strings are placed on the cape.
-const float RUNNER_LIFE_MS = 1500;          // how long a dot lasts
+// Light 0 is the one next to the lapel. As placed on the mock cape (20 Nov),
+// each string runs:
+//     6 lights  down the front edge, below the lapel
+//     4 lights  across, above the hem: the crossing, always dark
+//     7 lights  up the outer line
+//     the rest  (33) coiled at the top of the outer line, always dark
+// A dot keeps its speed through the crossing, unseen: it goes out at the
+// bottom of the front edge and comes back a third of a second later at the
+// bottom of the outer line. It lasts just long enough to reach the top of the
+// outer line. The dark lights are still sent black every frame: a light that
+// gets no data is not reliably dark.
+const uint8_t STRAND_FRONT_LIGHTS = 6;
+const uint8_t STRAND_CROSSING_LIGHTS = 4;
+const uint8_t STRAND_OUTER_LIGHTS = 7;
+const uint8_t STRAND_OUTER_FROM = STRAND_FRONT_LIGHTS + STRAND_CROSSING_LIGHTS;
+const uint8_t STRAND_PATH_LIGHTS = STRAND_OUTER_FROM + STRAND_OUTER_LIGHTS;
+
+// True for the lights that may show: the front edge and the outer line.
+bool strandLightShows(uint8_t light) {
+  return light < STRAND_FRONT_LIGHTS || (light >= STRAND_OUTER_FROM && light < STRAND_PATH_LIGHTS);
+}
+
+const float RUNNER_LIFE_MS = 1500;          // how long a dot lasts: 18 lights' travel, the path is 17
 const float RUNNER_LIGHTS_PER_MS = 0.012f;  // how fast it travels: 12 lights, 1.2 m, a second
 const float RUNNER_WIDTH_LIGHTS = 1.0f;     // 1 = passed smoothly from each light to the next
 
@@ -516,11 +535,15 @@ void drawStrands(uint32_t now) {
       runner.active = false;
       continue;
     }
+    // A steady fade over the dot's life. (Until 20 Nov it fell away faster,
+    // with the square of what remained; on the placed path that left the
+    // outer line almost dark. The start is no brighter than before.)
     const float remaining = 1.0f - age / RUNNER_LIFE_MS;
-    const float level = runner.strength * remaining * remaining;
+    const float level = runner.strength * remaining;
     const float position = age * RUNNER_LIGHTS_PER_MS;
     const Colour colour = colourOfNote(runner.note);
-    for (uint8_t light = 0; light < STRAND_LIGHTS; light++) {
+    for (uint8_t light = 0; light < STRAND_PATH_LIGHTS; light++) {
+      if (!strandLightShows(light)) continue;
       const float distance = fabsf((float)light - position);
       if (distance < RUNNER_WIDTH_LIGHTS) {
         addColour(lights[light], colour, level * (1.0f - distance / RUNNER_WIDTH_LIGHTS));
