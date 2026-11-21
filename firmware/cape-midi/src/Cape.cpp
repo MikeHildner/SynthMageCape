@@ -82,10 +82,11 @@ struct Preset {
   uint8_t organFromNote;  // keys from this note up are organ keys; 128 for none
   bool dotsFullTrip;      // the strings: every key sends a dot that makes the full trip (see "the strings")
   bool collarOnPressure;  // the collar is dark except under aftertouch (see "the collar")
+  bool shouldersOnChord;  // the shoulders come alive while four or more keys are held (see "the shoulders")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96, false, false},  // 96 is C7 (60 is C4)
-    {"Default", 128, true, true},
+    {"Roll With The Changes - Test", 96, false, false, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true, true, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
@@ -716,6 +717,15 @@ void drawNotes(uint32_t now) {
 // ripple, so they send none either. Both shoulders show the same. With
 // nothing played they are dark.
 //
+// In a preset with shouldersOnChord they also come alive on a big chord.
+// While SHOULDER_ALIVE_KEYS or more keys are held down (keys, not notes the
+// pedal is holding), every light of both epaulettes is on: it comes up
+// quickly, and the rows are shared out among the held keys, each in its own
+// colour, the lowest key at the neck and the highest at the edge. All at one
+// level, however hard the keys were struck. With fewer keys held it fades
+// out, more slowly. The wavefronts carry on throughout; where one crosses
+// the glow, a light shows the brighter of the two, not their sum.
+//
 // The ruler that tested the wiring is in git history (drawShoulderRuler,
 // commit 8748bdb and before).
 const uint8_t SHOULDER_PIN = 7;  // output 4 on the shifter board
@@ -728,9 +738,50 @@ const float SHOULDER_LIFE_MS = 450;          // how long a wavefront lasts: just
 const float SHOULDER_ROWS_PER_MS = 0.030f;   // how fast it crosses: 30 rows, half a metre, a second
 const float SHOULDER_WIDTH_ROWS = 2.0f;      // its softness
 
-void shouldersDark() { fill_solid(shoulders, SHOULDER_PIXELS, CRGB::Black); }
+const uint8_t SHOULDER_ALIVE_KEYS = 4;        // shouldersOnChord: this many keys held brings them alive
+const float SHOULDER_ALIVE_LEVEL = 0.35f;     // how bright then, 0..1 of the ceiling
+const float SHOULDER_ALIVE_ATTACK_MS = 60;    // it comes up this fast
+const float SHOULDER_ALIVE_RELEASE_MS = 300;  // and falls away this fast
+// The chord glow each row shows now, moving towards what it should show.
+Colour shoulderGlow[SHOULDER_ROWS] = {};
+
+void shouldersDark() {
+  memset(shoulderGlow, 0, sizeof(shoulderGlow));
+  fill_solid(shoulders, SHOULDER_PIXELS, CRGB::Black);
+}
+
+// Moves the chord glow one frame on.
+void updateShoulderGlow(float elapsedMs) {
+  if (!PRESETS[presetNow].shouldersOnChord) {
+    memset(shoulderGlow, 0, sizeof(shoulderGlow));
+    return;
+  }
+  // The keys held, lowest first. More than one a row cannot be shown.
+  uint8_t held[SHOULDER_ROWS];
+  uint8_t count = 0;
+  for (uint8_t note = 0; note < 128 && count < SHOULDER_ROWS; note++) {
+    if (heldVelocity[note] > 0) held[count++] = note;
+  }
+  const bool alive = count >= SHOULDER_ALIVE_KEYS;
+  const float attack = 1.0f - expf(-elapsedMs / SHOULDER_ALIVE_ATTACK_MS);
+  const float release = 1.0f - expf(-elapsedMs / SHOULDER_ALIVE_RELEASE_MS);
+  for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
+    Colour target = {0, 0, 0};
+    if (alive) addColour(target, colourOfNote(held[row * count / SHOULDER_ROWS]), SHOULDER_ALIVE_LEVEL);
+    Colour& shown = shoulderGlow[row];
+    const bool rising = target.r + target.g + target.b > shown.r + shown.g + shown.b;
+    const float step = rising ? attack : release;
+    shown.r += (target.r - shown.r) * step;
+    shown.g += (target.g - shown.g) * step;
+    shown.b += (target.b - shown.b) * step;
+  }
+}
 
 void drawShoulders(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  updateShoulderGlow((float)(now - lastDrawMs));
+  lastDrawMs = now;
+
   Colour rows[SHOULDER_ROWS] = {};
   for (Runner& runner : shoulderRunners) {
     if (!runner.active) continue;
@@ -753,7 +804,9 @@ void drawShoulders(uint32_t now) {
   for (uint8_t shoulder = 0; shoulder < 2; shoulder++) {
     CRGB* leds = shoulders + shoulder * LEDS_PER_SHOULDER;
     for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
-      const CRGB colour = toLeds(rows[row]);
+      Colour both = rows[row];
+      raiseColour(both, shoulderGlow[row], 1.0f);
+      const CRGB colour = toLeds(both);
       leds[row] = colour;
       leds[LEDS_PER_SHOULDER - 1 - row] = colour;
     }
@@ -908,6 +961,7 @@ void capeAllNotesOff() {
   memset(sparkle, 0, sizeof(sparkle));
   memset(collarNow, 0, sizeof(collarNow));
   collarOpen = false;
+  memset(shoulderGlow, 0, sizeof(shoulderGlow));
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
   for (Runner& runner : runners) runner.active = false;

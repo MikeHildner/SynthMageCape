@@ -29,6 +29,8 @@
 //     collar dark, then glowing in the Default preset: dark while you play,
 //                               glowing while held keys are pressed down
 //                               harder (aftertouch, Channel Pressure)
+//     shoulders fully lit       in the Default preset: four or more keys
+//                               are held down
 //     white bars on the lapels  button two just chose a preset: as many
 //                               bars as its number, for a second
 #include <Arduino.h>
