@@ -21,7 +21,7 @@ const uint8_t LEDS_PER_LAPEL = 2 * ROWS;
 // output carries 96 + 50 pixels. The string's input is the end with the two
 // loose wires; its lights are 10 cm apart and take the same signal and
 // colour order as the strips. The ruler that tested all this is in git
-// history (drawRuler, commit a5a623f and before).
+// history (drawRuler, commit 0ff377c and before).
 const uint8_t STRAND_LIGHTS = 50;
 const uint8_t LAPEL_CHAIN_PIXELS = LEDS_PER_LAPEL + STRAND_LIGHTS;
 
@@ -658,7 +658,7 @@ void drawNotes(uint32_t now) {
 // nothing played they are dark.
 //
 // The ruler that tested the wiring is in git history (drawShoulderRuler,
-// commit 0ca52fb and before).
+// commit 8748bdb and before).
 const uint8_t SHOULDER_PIN = 7;  // output 4 on the shifter board
 const uint8_t SHOULDER_ROWS = 12;
 const uint8_t LEDS_PER_SHOULDER = 2 * SHOULDER_ROWS;

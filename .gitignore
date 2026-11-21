@@ -28,3 +28,6 @@ backups/
 # Wi-Fi password for the cape firmware, and the generated build time
 firmware/cape-midi/include/secrets.h
 firmware/cape-midi/include/BuildStamp.h
+
+# Working notes for the build (a private running log, not part of the published project)
+docs/next-steps.md
