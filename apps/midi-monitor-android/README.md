@@ -69,6 +69,20 @@ while one control-surface fader was moved, with the Kronos in its normal mode.
   for more than two minutes after the fader stopped. Before the fader was
   touched, clock ticks arrived every 20.8 ms (120 BPM) without a gap.
 
+Reconnecting from the app brought the stream back.
+
+The same fader with the control surface in External mode (EXT), captured the
+same day:
+
+- It sends Control Change 91 on channel 1, `B0 5B vv`, with `vv` covering the
+  full 0 to 127. One message per 5-byte packet, 189 of them in a 2.4 second
+  sweep down and back up.
+- The clock kept its rate throughout, nothing was flagged as a problem, and
+  the stream carried on afterwards.
+- In Audio mode the fader sent nothing over MIDI at all.
+- Pressing a CONTROL ASSIGN button, or changing mode or program, sends one or
+  two short System Exclusive messages. Those arrived intact and did no harm.
+
 For the cape this means: do not send control-surface System Exclusive through
 the adapter. Put the control surface in External mode so the fader sends a
 Control Change (three bytes), and consider switching System Exclusive
