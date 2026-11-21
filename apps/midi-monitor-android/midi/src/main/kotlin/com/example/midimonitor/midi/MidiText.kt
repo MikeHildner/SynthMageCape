@@ -44,7 +44,7 @@ fun MidiMessage.describe(): String = when (this) {
     is ProgramChange -> "Program change  $program"
     is ChannelAftertouch -> "Channel aftertouch  $pressure"
     is PitchBend -> "Pitch bend  " + if (value > 0) "+$value" else "$value"
-    is SystemExclusive -> "System Exclusive  ${payload.size} bytes"
+    is SystemExclusive -> describeSystemExclusive(this)
     is MtcQuarterFrame -> "MTC quarter frame  $value"
     is SongPosition -> "Song position  $beats"
     is SongSelect -> "Song select  $song"
@@ -57,6 +57,29 @@ fun MidiMessage.describe(): String = when (this) {
     SystemReset -> "System reset"
     is Undefined -> "Undefined status %02X".format(status)
 }
+
+/**
+ * System Exclusive is the escape hatch of MIDI: after F0 comes a manufacturer
+ * ID, and everything after that is whatever the manufacturer decided. The bytes
+ * are shown in full (between the F0 and F7, which are left out) because their
+ * meaning can only be found in the instrument's own MIDI implementation document.
+ */
+private fun describeSystemExclusive(sysex: SystemExclusive): String {
+    val payload = sysex.payload
+    val shown = payload.take(SYSEX_BYTES_SHOWN).toByteArray().toHexString()
+    val more = if (payload.size > SYSEX_BYTES_SHOWN) " …" else ""
+    // The first byte is the manufacturer ID. Only the ones likely to turn up
+    // here are named; 7E and 7F are the "universal" messages any maker may use.
+    val maker = when (payload.firstOrNull()?.toInt()) {
+        0x42 -> " (Korg)"
+        0x7E -> " (universal non-real-time)"
+        0x7F -> " (universal real-time)"
+        else -> ""
+    }
+    return "System Exclusive$maker  ${payload.size} bytes: $shown$more"
+}
+
+private const val SYSEX_BYTES_SHOWN = 32
 
 private fun describeControlChange(cc: ControlChange): String {
     val name = CONTROLLER_NAMES[cc.controller]

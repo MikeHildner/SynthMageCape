@@ -146,9 +146,13 @@ class BleMidiParserTest {
     fun `system exclusive continues across packets`() {
         val parser = BleMidiParser()
         // Continuation packets have a header and then go straight into data bytes.
+        assertEquals(null, parser.pendingSysexSize)
         assertEquals(emptyList(), parser.parse(hex("80 80 F0 01 02 03")).messages)
+        assertEquals(3, parser.pendingSysexSize)
         assertEquals(emptyList(), parser.parse(hex("80 04 05 06")).messages)
+        assertEquals(6, parser.pendingSysexSize)
         val last = parser.parse(hex("80 07 80 F7"))
+        assertEquals(null, parser.pendingSysexSize)
         assertEquals(emptyList(), last.problems)
         assertEquals(listOf(SystemExclusive(hex("01 02 03 04 05 06 07"))), last.messages.map { it.message })
     }

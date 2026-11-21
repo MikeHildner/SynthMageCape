@@ -51,6 +51,14 @@ class BleMidiParser {
     /** Payload bytes of a System Exclusive message in progress, or null when there is none. */
     private var sysex: MutableList<Byte>? = null
 
+    /**
+     * How many payload bytes of an unfinished System Exclusive have been
+     * collected, or null when none is in progress. Lets a monitor show that a
+     * packet carried part of a long message even though it completed nothing.
+     */
+    val pendingSysexSize: Int?
+        get() = sysex?.size
+
     /** Forget any half-received System Exclusive. Call when the connection drops. */
     fun reset() {
         sysex = null

@@ -2,6 +2,7 @@ package com.example.midimonitor
 
 import android.app.Application
 import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.midimonitor.ble.BleMidiConnection
@@ -140,12 +141,26 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
         val parsed = parser.parse(packet)
 
+        // Every packet also goes to the system log, clock ticks included, so a
+        // session can be captured from a PC:  adb logcat -s MidiMonitor
+        Log.d(LOG_TAG, packet.toHexString())
+
         // Clock ticks arrive 24 times per quarter note and active sensing three
         // times a second: counted, never listed.
         val clockTicks = parsed.messages.count { it.message == MidiMessage.TimingClock }
-        val lines = parsed.messages
+        val messageLines = parsed.messages
             .filter { it.message != MidiMessage.TimingClock && it.message != MidiMessage.ActiveSensing }
             .map { MessageLine(it.message.channelNumber, it.message.describe(), it.timestamp) }
+
+        // A packet can carry part of a System Exclusive and complete nothing.
+        // Say so, or the packet would be missing from the list and the hex of a
+        // long message could never be read in full.
+        val pending = parser.pendingSysexSize
+        val lines = if (pending != null) {
+            messageLines + MessageLine(null, "System Exclusive unfinished, $pending bytes so far", 0)
+        } else {
+            messageLines
+        }
 
         val entry = if (lines.isEmpty() && parsed.problems.isEmpty()) {
             null // nothing but clock or active sensing in this packet
@@ -188,5 +203,6 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
     companion object {
         const val MAX_ENTRIES = 500
+        private const val LOG_TAG = "MidiMonitor"
     }
 }

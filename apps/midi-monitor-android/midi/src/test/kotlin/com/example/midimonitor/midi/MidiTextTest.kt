@@ -43,6 +43,24 @@ class MidiTextTest {
     }
 
     @Test
+    fun `system exclusive shows its bytes and names the maker`() {
+        assertEquals(
+            "System Exclusive (Korg)  4 bytes: 42 30 68 41",
+            MidiMessage.SystemExclusive(bytes(0x42, 0x30, 0x68, 0x41)).describe(),
+        )
+        assertEquals(
+            "System Exclusive  2 bytes: 41 10",
+            MidiMessage.SystemExclusive(bytes(0x41, 0x10)).describe(),
+        )
+    }
+
+    @Test
+    fun `long system exclusive is cut off after 32 bytes`() {
+        val text = MidiMessage.SystemExclusive(ByteArray(40) { 0x01 }).describe()
+        assertEquals("System Exclusive  40 bytes: " + List(32) { "01" }.joinToString(" ") + " …", text)
+    }
+
+    @Test
     fun `hex string`() {
         assertEquals("80 80 90 3C 7F", bytes(0x80, 0x80, 0x90, 0x3C, 0x7F).toHexString())
     }
