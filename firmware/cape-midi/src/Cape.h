@@ -56,6 +56,8 @@ const Look LOOK = Look::NoteNames;
 //            line. Mike plays standing behind the keyboard, which hides
 //            his middle: the lapels show above it and the strings below
 //            it, so every key should show in both places.
+//            The collar is dark, except while a held key is pressed
+//            down harder (aftertouch; see capeChannelPressure).
 //
 // No preset sets the brightness.
 uint8_t capePresetCount();
@@ -89,6 +91,14 @@ void capeBend(int bend);
 // adds vibrato). The colour of everything that is lit swings to and fro,
 // six times a second, wider the further the joystick is pushed.
 void capeModulation(uint8_t value);
+
+// Aftertouch: how hard the held keys are being pressed down after they were
+// struck (Channel Pressure, 0-127, 0 when the pressure is let go; one value
+// for the whole keyboard). In a preset whose collar waits for it, the collar
+// is dark until the pressure reaches COLLAR_PRESSURE_ON, then comes up
+// quickly and shows the notes sounding; when the pressure is back at 0 it
+// falls away, more slowly. Other presets take no notice.
+void capeChannelPressure(uint8_t value);
 
 // Draws one frame and sends it to the LEDs. Call often; it paces itself.
 void capeShow(LinkState state);

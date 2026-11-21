@@ -81,10 +81,11 @@ struct Preset {
   const char* name;
   uint8_t organFromNote;  // keys from this note up are organ keys; 128 for none
   bool dotsFullTrip;      // the strings: every key sends a dot that makes the full trip (see "the strings")
+  bool collarOnPressure;  // the collar is dark except under aftertouch (see "the collar")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96, false},  // 96 is C7 (60 is C4)
-    {"Default", 128, true},
+    {"Roll With The Changes - Test", 96, false, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
@@ -322,6 +323,14 @@ void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
 // wearer's face, so it is the quietest light on the cape: COLLAR_LEVEL is the
 // most it ever shows, as a fraction of the brightness ceiling.
 //
+// In a preset with collarOnPressure all of that waits for aftertouch: the
+// collar is dark while you simply play. Press down harder on held keys and,
+// once the pressure reaches COLLAR_PRESSURE_ON, the collar opens: it comes
+// up quickly and shows the bands as above. It stays open while the pressure
+// wavers, and closes when the pressure is back at 0, falling away more
+// slowly than it came. It also closes when no key is held any more, in case
+// the keyboard's last pressure message was not a 0.
+//
 // The strip: 160 pixels a metre, WS2812B, green-red-blue order like the
 // lapels, input at the socket end. On the bench it is still the whole uncut
 // 2 m (320 pixels). The collar is the first COLLAR_PIXELS from the input end.
@@ -335,6 +344,8 @@ const uint16_t COLLAR_PIXELS = 128;        // the part that is the collar: 80 cm
 const float COLLAR_LEVEL = 0.30f;          // the glow at its brightest, 0..1 of the ceiling
 const float COLLAR_ATTACK_MS = 80;         // the glow comes up this fast
 const float COLLAR_RELEASE_MS = 150;       // and falls away this fast
+const uint8_t COLLAR_PRESSURE_ON = 10;     // collarOnPressure: aftertouch of this much (0-127) opens the collar
+const float COLLAR_CLOSE_MS = 350;         // collarOnPressure: and it falls away this fast when it closes
 const uint8_t COLLAR_MARK_PIXELS = 4;      // length of the link-state marks, about 2.5 cm
 const uint32_t COLLAR_SWEEP_MS = 400;      // the connected sweep takes this long round the collar
 
@@ -344,6 +355,7 @@ CRGB collar[COLLAR_STRIP_PIXELS];
 // side is the mirror image.
 const uint16_t COLLAR_HALF = COLLAR_PIXELS / 2;
 Colour collarNow[COLLAR_HALF] = {};
+bool collarOpen = false;  // collarOnPressure: aftertouch has opened the collar
 
 // Why the collar needs help to fade smoothly. An LED takes whole numbers,
 // 0-255, and the brightness ceiling scales everything down to 0-32. The
@@ -398,7 +410,9 @@ void drawCollar(uint32_t now) {
   uint8_t notes[COLLAR_HALF];
   float weights[COLLAR_HALF];
   uint8_t count = 0;
+  bool keyHeld = false;
   for (uint8_t note = 0; note < 128 && count < COLLAR_HALF; note++) {
+    if (heldVelocity[note] > 0) keyHeld = true;
     float weight = heldVelocity[note] / 127.0f;
     if (weight == 0 && sustainLevel[note] > 0) {
       weight = sustainLevel[note] / HELD_GLOW * (pedalDown ? pedalDepth : 1.0f);
@@ -408,6 +422,12 @@ void drawCollar(uint32_t now) {
     weights[count] = fminf(1.0f, weight);
     count++;
   }
+
+  // A collar that waits for aftertouch shows nothing while it is closed.
+  const bool waits = PRESETS[presetNow].collarOnPressure;
+  if (!keyHeld) collarOpen = false;
+  const bool closed = waits && !collarOpen;
+  if (closed) count = 0;
 
   // Each band's colour at its note's level.
   Colour bands[COLLAR_HALF];
@@ -436,7 +456,7 @@ void drawCollar(uint32_t now) {
   frame ^= 1;
 
   const float attack = 1.0f - expf(-elapsed / COLLAR_ATTACK_MS);
-  const float release = 1.0f - expf(-elapsed / COLLAR_RELEASE_MS);
+  const float release = 1.0f - expf(-elapsed / (closed ? COLLAR_CLOSE_MS : COLLAR_RELEASE_MS));
   const Colour dark = {0, 0, 0};
   for (uint16_t i = 0; i < COLLAR_HALF; i++) {
     // Which band this pixel is in, and so the colour it is heading for.
@@ -869,6 +889,16 @@ uint16_t capeLongestGapMs() {
   return gap > 65535 ? 65535 : (uint16_t)gap;
 }
 
+void capeChannelPressure(uint8_t value) {
+  // Opens at COLLAR_PRESSURE_ON and closes only at 0, so pressure wavering
+  // around the opening value does not make the collar flicker.
+  if (value >= COLLAR_PRESSURE_ON) {
+    collarOpen = true;
+  } else if (value == 0) {
+    collarOpen = false;
+  }
+}
+
 void capeAllNotesOff() {
   bendShift = 0;
   vibratoDepth = 0;
@@ -877,6 +907,7 @@ void capeAllNotesOff() {
   memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
   memset(collarNow, 0, sizeof(collarNow));
+  collarOpen = false;
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
   for (Runner& runner : runners) runner.active = false;
