@@ -46,6 +46,35 @@ reported from the app's screen. This is the input the cape firmware has to handl
   flagged as a problem.
 - Not yet checked: aftertouch, and whether active sensing is sent.
 
+### Control surface faders send System Exclusive, and a burst of it stalls the adapter
+
+Captured on 21 Nov 2026 from the phone's log (`adb logcat -s MidiMonitor`)
+while one control-surface fader was moved, with the Kronos in its normal mode.
+
+- Each step of the fader is one 14-byte Korg message, with the position
+  (00 to 7F) in the last byte before the F7:
+
+      F0 42 30 68 43 04 07 00 02 00 00 00 vv F7
+
+- The WIDI Master delivered this as bursts of five 20-byte packets about every
+  80 ms. Messages are split across packets exactly as the parser expects (a
+  continuation packet is a header byte followed directly by data), which
+  happened 80 times without a problem.
+- It cannot keep up. Fader positions are skipped between bursts, and 18 times a
+  burst ended with a message missing its F7, followed by a fresh F0. That is
+  what the app reports as "System Exclusive cut short by status F0"; the data
+  was lost before it reached the phone.
+- While this was going on the MIDI clock stopped arriving, and it did not come
+  back afterwards: the connection stayed up, but no packet of any kind arrived
+  for more than two minutes after the fader stopped. Before the fader was
+  touched, clock ticks arrived every 20.8 ms (120 BPM) without a gap.
+
+For the cape this means: do not send control-surface System Exclusive through
+the adapter. Put the control surface in External mode so the fader sends a
+Control Change (three bytes), and consider switching System Exclusive
+transmission off on the Kronos so that touching a control on stage cannot
+stall the stream.
+
 ## Requirements
 
 - Android 13 or later (API level 33), with Bluetooth LE. A phone emulator cannot
