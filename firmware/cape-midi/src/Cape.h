@@ -48,8 +48,11 @@ const Look LOOK = Look::NoteNames;
 //            cape those keys do not ripple. While one is held, the lapels
 //            carry a soft travelling wash of its colour.
 //     2  "Default"
-//            Mike's first own preset, being built. For now it is preset 1
-//            without the organ keys: every key ripples.
+//            Mike's first own preset, being built. The lapels as in
+//            preset 1, but without the organ keys: every key ripples.
+//            On the strings every dot makes the full trip, whatever the
+//            key: it starts as bright as the key was struck and is still
+//            lit when it runs off the top of the outer line.
 //
 // No preset sets the brightness.
 uint8_t capePresetCount();

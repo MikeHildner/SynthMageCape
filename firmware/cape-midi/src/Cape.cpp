@@ -80,10 +80,11 @@ LinkState lastState = LinkState::Scanning;
 struct Preset {
   const char* name;
   uint8_t organFromNote;  // keys from this note up are organ keys; 128 for none
+  bool dotsFullTrip;      // the strings: every dot makes the full trip (see "the strings")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96},  // 96 is C7 (60 is C4)
-    {"Default", 128},
+    {"Roll With The Changes - Test", 96, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
@@ -492,6 +493,12 @@ void collarDark() {
 // bottom of the outer line. It lasts just long enough to reach the top of the
 // outer line. The dark lights are still sent black every frame: a light that
 // gets no data is not reliably dark.
+//
+// In a preset with dotsFullTrip the key does not decide how far a dot can be
+// followed. Every dot starts as bright as its key was struck, however far up
+// the lapel the key is, and it fades only part of the way, so it is still
+// lit when it runs off the top of the outer line. A key whose ripple dies on
+// the lapel still sends none, and a key further up still sends its dot later.
 const uint8_t STRAND_FRONT_LIGHTS = 6;
 const uint8_t STRAND_CROSSING_LIGHTS = 4;
 const uint8_t STRAND_OUTER_LIGHTS = 7;
@@ -506,6 +513,7 @@ bool strandLightShows(uint8_t light) {
 const float RUNNER_LIFE_MS = 1500;          // how long a dot lasts: 18 lights' travel, the path is 17
 const float RUNNER_LIGHTS_PER_MS = 0.012f;  // how fast it travels: 12 lights, 1.2 m, a second
 const float RUNNER_WIDTH_LIGHTS = 1.0f;     // 1 = passed smoothly from each light to the next
+const float RUNNER_FULL_TRIP_END = 0.35f;   // with dotsFullTrip: what is left of a dot at the end of its life
 
 struct Runner {
   bool active;
@@ -517,10 +525,13 @@ Runner runners[16];          // dots on the strings
 Runner shoulderRunners[16];  // wavefronts on the shoulders (see "the shoulders" below)
 
 // Books a runner in `list` for a wavefront that needs `travelMs` to reach the
-// end of the lapel. A wavefront that dies on the lapel books nothing.
-void bookRunner(Runner (&list)[16], uint8_t note, float travelMs, float strength, uint32_t struckMs) {
+// end of the lapel. A wavefront that dies on the lapel books nothing. The
+// runner starts as strong as the wavefront is by then, or with `keepStrength`
+// as strong as the key was struck.
+void bookRunner(Runner (&list)[16], uint8_t note, float travelMs, float strength, uint32_t struckMs,
+                bool keepStrength) {
   if (travelMs >= RIPPLE_LIFE_MS) return;
-  const float remaining = 1.0f - travelMs / RIPPLE_LIFE_MS;
+  const float remaining = keepStrength ? 1.0f : 1.0f - travelMs / RIPPLE_LIFE_MS;
 
   // Reuse a finished runner, or failing that the oldest one.
   Runner* slot = &list[0];
@@ -541,8 +552,8 @@ void bookRunner(Runner (&list)[16], uint8_t note, float travelMs, float strength
 // the one going down becomes a dot on the string, the one going up becomes a
 // wavefront on the shoulder.
 void launchRunners(uint8_t note, float row, float strength, uint32_t struckMs) {
-  bookRunner(runners, note, row / RIPPLE_ROWS_PER_MS, strength, struckMs);
-  bookRunner(shoulderRunners, note, ((ROWS - 1) - row) / RIPPLE_ROWS_PER_MS, strength, struckMs);
+  bookRunner(runners, note, row / RIPPLE_ROWS_PER_MS, strength, struckMs, PRESETS[presetNow].dotsFullTrip);
+  bookRunner(shoulderRunners, note, ((ROWS - 1) - row) / RIPPLE_ROWS_PER_MS, strength, struckMs, false);
 }
 
 void strandsDark() {
@@ -551,6 +562,9 @@ void strandsDark() {
 }
 
 void drawStrands(uint32_t now) {
+  // How much of a dot is left at the end of its life: nothing, or with
+  // dotsFullTrip enough to be seen all the way.
+  const float endLevel = PRESETS[presetNow].dotsFullTrip ? RUNNER_FULL_TRIP_END : 0.0f;
   Colour lights[STRAND_LIGHTS] = {};
   for (Runner& runner : runners) {
     if (!runner.active) continue;
@@ -563,7 +577,7 @@ void drawStrands(uint32_t now) {
     // A steady fade over the dot's life. (Until 20 Nov it fell away faster,
     // with the square of what remained; on the placed path that left the
     // outer line almost dark. The start is no brighter than before.)
-    const float remaining = 1.0f - age / RUNNER_LIFE_MS;
+    const float remaining = 1.0f - (1.0f - endLevel) * age / RUNNER_LIFE_MS;
     const float level = runner.strength * remaining;
     const float position = age * RUNNER_LIGHTS_PER_MS;
     const Colour colour = colourOfNote(runner.note);
