@@ -50,9 +50,12 @@ const Look LOOK = Look::NoteNames;
 //     2  "Default"
 //            Mike's first own preset, being built. The lapels as in
 //            preset 1, but without the organ keys: every key ripples.
-//            On the strings every dot makes the full trip, whatever the
-//            key: it starts as bright as the key was struck and is still
-//            lit when it runs off the top of the outer line.
+//            On the strings every key sends a dot and every dot makes
+//            the full trip: it starts as bright as the key was struck
+//            and is still lit when it runs off the top of the outer
+//            line. Mike plays standing behind the keyboard, which hides
+//            his middle: the lapels show above it and the strings below
+//            it, so every key should show in both places.
 //
 // No preset sets the brightness.
 uint8_t capePresetCount();

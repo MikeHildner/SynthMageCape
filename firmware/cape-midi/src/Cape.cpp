@@ -80,7 +80,7 @@ LinkState lastState = LinkState::Scanning;
 struct Preset {
   const char* name;
   uint8_t organFromNote;  // keys from this note up are organ keys; 128 for none
-  bool dotsFullTrip;      // the strings: every dot makes the full trip (see "the strings")
+  bool dotsFullTrip;      // the strings: every key sends a dot that makes the full trip (see "the strings")
 };
 const Preset PRESETS[] = {
     {"Roll With The Changes - Test", 96, false},  // 96 is C7 (60 is C4)
@@ -494,11 +494,14 @@ void collarDark() {
 // outer line. The dark lights are still sent black every frame: a light that
 // gets no data is not reliably dark.
 //
-// In a preset with dotsFullTrip the key does not decide how far a dot can be
-// followed. Every dot starts as bright as its key was struck, however far up
-// the lapel the key is, and it fades only part of the way, so it is still
-// lit when it runs off the top of the outer line. A key whose ripple dies on
-// the lapel still sends none, and a key further up still sends its dot later.
+// In a preset with dotsFullTrip the key decides neither whether there is a
+// dot nor how far it can be followed. Every key sends one. It starts as
+// bright as the key was struck, however far up the lapel the key is, and it
+// fades only part of the way, so it is still lit when it runs off the top of
+// the outer line. A key further up still sends its dot later, when its
+// wavefront reaches the bottom of the lapel; for the highest keys (above G5),
+// whose wavefront dies on the way, the dot starts at the moment the ripple
+// dies, 0.7 s after the key.
 const uint8_t STRAND_FRONT_LIGHTS = 6;
 const uint8_t STRAND_CROSSING_LIGHTS = 4;
 const uint8_t STRAND_OUTER_LIGHTS = 7;
@@ -521,17 +524,24 @@ struct Runner {
   float strength;    // 0..1 as it leaves the lapel
   uint32_t startMs;  // when it leaves the lapel; in the future while the wavefront is still on its way
 };
-Runner runners[16];          // dots on the strings
-Runner shoulderRunners[16];  // wavefronts on the shoulders (see "the shoulders" below)
+// Room for this many at a time in each list. A dot can be up to 2.2 s old
+// (0.7 s waiting, 1.5 s travelling), so 32 covers 14 keys a second.
+const uint8_t RUNNER_SLOTS = 32;
+Runner runners[RUNNER_SLOTS];          // dots on the strings
+Runner shoulderRunners[RUNNER_SLOTS];  // wavefronts on the shoulders (see "the shoulders" below)
 
 // Books a runner in `list` for a wavefront that needs `travelMs` to reach the
-// end of the lapel. A wavefront that dies on the lapel books nothing. The
-// runner starts as strong as the wavefront is by then, or with `keepStrength`
-// as strong as the key was struck.
-void bookRunner(Runner (&list)[16], uint8_t note, float travelMs, float strength, uint32_t struckMs,
-                bool keepStrength) {
-  if (travelMs >= RIPPLE_LIFE_MS) return;
-  const float remaining = keepStrength ? 1.0f : 1.0f - travelMs / RIPPLE_LIFE_MS;
+// end of the lapel. The runner starts as strong as the wavefront is by then,
+// and a wavefront that dies on the lapel books nothing. With `always` every
+// key books one, as strong as the key was struck; where the wavefront dies
+// on the lapel, the runner starts at that moment.
+void bookRunner(Runner (&list)[RUNNER_SLOTS], uint8_t note, float travelMs, float strength, uint32_t struckMs,
+                bool always) {
+  if (travelMs >= RIPPLE_LIFE_MS) {
+    if (!always) return;
+    travelMs = RIPPLE_LIFE_MS;
+  }
+  const float remaining = always ? 1.0f : 1.0f - travelMs / RIPPLE_LIFE_MS;
 
   // Reuse a finished runner, or failing that the oldest one.
   Runner* slot = &list[0];
