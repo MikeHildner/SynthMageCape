@@ -32,7 +32,7 @@ portMUX_TYPE logLock = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t serialSkipped = 0;  // lines not sent to the serial port: it was busy
 
 void handleStatus() {
-  char page[560];
+  char page[700];
   snprintf(page, sizeof(page),
            "Synth Mage cape, MIDI firmware\n"
            "built        %s\n"
@@ -40,12 +40,14 @@ void handleStatus() {
            "bluetooth    %s\n"
            "wifi signal  %d dBm\n"
            "free memory  %lu bytes\n"
+           "preset       %u of %u: %s (button two steps to the next)\n"
            "brightness   ceiling %u of 255\n"
            "frame rate   %u a second\n"
            "longest gap  %u ms between frames, since this page was last read\n"
            "serial port  %lu lines skipped because it was busy (they are in /log)\n",
            BUILD_STAMP, (unsigned long)(millis() / 1000), linkStatusText(), WiFi.RSSI(),
-           (unsigned long)ESP.getFreeHeap(), MAX_BRIGHTNESS, capeFramesPerSecond(), capeLongestGapMs(),
+           (unsigned long)ESP.getFreeHeap(), capePresetNumber(), capePresetCount(), capePresetName(), MAX_BRIGHTNESS,
+           capeFramesPerSecond(), capeLongestGapMs(),
            (unsigned long)serialSkipped);
   server.send(200, "text/plain", page);
 }

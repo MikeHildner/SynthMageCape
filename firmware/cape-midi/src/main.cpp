@@ -17,7 +17,7 @@
 //                               colour is the note name (see LOOK in Cape.h)
 //     low glow on a row         that key is being held, or was released with
 //                               the sustain pedal down (deeper pedal, brighter)
-//     soft wash on both lapels  an organ key is held (see ORGAN_FROM_NOTE)
+//     soft wash on both lapels  an organ key is held (preset 1 only; see Cape.h)
 //     dot running along a       a low note's ripple ran off the bottom of the
 //     string                    lapel; the lower the note, the brighter the dot
 //     wavefront crossing the    a high note's ripple ran off the top of the
@@ -26,6 +26,8 @@
 //                               the collar, in its colour and at its level
 //     colours swinging          joystick up (controller 1, vibrato): the
 //                               further up, the wider the swing
+//     white bars on the lapels  button two just chose a preset: as many
+//                               bars as its number, for a second
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
@@ -269,6 +271,27 @@ const char* linkStatusText() {
   }
 }
 
+// ---- the buttons
+//
+// Three momentary buttons are wired to GPIO 9, 10 and 11. Each connects its
+// pin to ground while pressed; the chip's own pull-up holds the pin high
+// otherwise. So far only button two is read: a press chooses the next preset.
+const uint8_t PRESET_BUTTON_PIN = 10;
+const uint32_t BUTTON_SETTLE_MS = 40;  // a contact bounces for a few ms as it closes; wait that out
+
+void readButtons() {
+  static bool wasDown = false;
+  static uint32_t changedMs = 0;
+  const bool down = digitalRead(PRESET_BUTTON_PIN) == LOW;
+  const uint32_t now = millis();
+  if (down == wasDown || now - changedMs < BUTTON_SETTLE_MS) return;
+  wasDown = down;
+  changedMs = now;
+  if (!down) return;  // act on the press, not the release
+  capeNextPreset();
+  say("Button two: preset %u of %u, %s\n", capePresetNumber(), capePresetCount(), capePresetName());
+}
+
 void setup() {
   // Room for a burst of lines, so say() seldom has to skip one (see Net.cpp).
   Serial.setTxBufferSize(2048);
@@ -278,6 +301,8 @@ void setup() {
   say("Synth Mage cape, MIDI firmware. Built %s\n", BUILD_STAMP);
 
   capeBegin();
+  pinMode(PRESET_BUTTON_PIN, INPUT_PULLUP);
+  say("Preset %u of %u: %s\n", capePresetNumber(), capePresetCount(), capePresetName());
   runParserSelfTest();
   netBegin();
 
@@ -332,6 +357,7 @@ void loop() {
   }
 
   reportTempo();
+  readButtons();
   capeShow(linkState);
   netLoop();
   delay(1);

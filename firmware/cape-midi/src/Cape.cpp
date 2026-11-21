@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
+#include <Preferences.h>
 
 namespace {
 
@@ -75,7 +76,21 @@ float pedalDepth = 0;     // 0.5 (just down) to 1 (fully down)
 uint32_t connectedAtMs = 0;
 LinkState lastState = LinkState::Scanning;
 
-bool isOrganNote(uint8_t note) { return note >= ORGAN_FROM_NOTE; }
+// ---- presets (described in Cape.h)
+struct Preset {
+  const char* name;
+  uint8_t organFromNote;  // keys from this note up are organ keys; 128 for none
+};
+const Preset PRESETS[] = {
+    {"Roll With The Changes - Test", 96},  // 96 is C7 (60 is C4)
+    {"Default", 128},
+};
+const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
+uint8_t presetNow = 0;         // index into PRESETS
+uint32_t presetChosenMs = 0;   // when button two last chose one; 0 for not yet
+Preferences settings;          // the cape's small permanent store: survives power off
+
+bool isOrganNote(uint8_t note) { return note >= PRESETS[presetNow].organFromNote; }
 
 float rowOfNote(uint8_t note) {
   if (note <= LOWEST_NOTE) return 0;
@@ -185,7 +200,7 @@ CRGB toLeds(const Colour& colour) {
 
 // ---- the organ keys
 //
-// Keys from ORGAN_FROM_NOTE up play an organ, which sounds for as long as the
+// Keys from the preset's organFromNote up play an organ, which sounds for as long as the
 // key is down and does not die away. So these keys do not ripple. While one is
 // held, both lapels carry a soft wash of its colour, with slow swells
 // travelling up them, like the turning speaker of an organ. Several organ keys
@@ -259,7 +274,7 @@ void drawSparkle(uint8_t notesSounding, float elapsedMs) {
 void addOrganWash(Colour rows[], uint32_t now, float elapsedMs) {
   Colour mix = {0, 0, 0};
   float total = 0;
-  for (uint8_t note = ORGAN_FROM_NOTE; note < 128; note++) {
+  for (uint8_t note = PRESETS[presetNow].organFromNote; note < 128; note++) {
     float& level = organLevel[note];
     const float target = heldVelocity[note] > 0 ? 1.0f : 0.0f;
     if (level == target) {
@@ -701,9 +716,46 @@ void drawShoulders(uint32_t now) {
   }
 }
 
+// ---- which preset: the signal on the lapels
+//
+// Button two just chose a preset. For a little over a second the lapels show
+// as many white bars as the preset's number, counted up from near the hem,
+// on top of whatever else they are showing. The wearer sees the lapels by
+// looking down; the collar would be out of sight.
+const uint32_t PRESET_SIGNAL_MS = 1200;
+const uint8_t PRESET_FIRST_ROW = 6;  // the first bar starts here
+const uint8_t PRESET_BAR_ROWS = 3;   // each bar is this many rows
+const uint8_t PRESET_BAR_STEP = 6;   // from the start of one bar to the start of the next
+
+void drawPresetSignal(uint32_t now) {
+  if (presetChosenMs == 0 || now - presetChosenMs >= PRESET_SIGNAL_MS) return;
+  for (uint8_t bar = 0; bar <= presetNow; bar++) {
+    for (uint8_t i = 0; i < PRESET_BAR_ROWS; i++) {
+      const uint8_t row = PRESET_FIRST_ROW + bar * PRESET_BAR_STEP + i;
+      if (row < ROWS) setRow(row, CRGB(70, 70, 70));
+    }
+  }
+}
+
 }  // namespace
 
+uint8_t capePresetCount() { return PRESET_COUNT; }
+uint8_t capePresetNumber() { return presetNow + 1; }
+const char* capePresetName() { return PRESETS[presetNow].name; }
+
+void capeNextPreset() {
+  presetNow = (presetNow + 1) % PRESET_COUNT;
+  settings.putUChar("preset", presetNow);
+  presetChosenMs = millis();
+  if (presetChosenMs == 0) presetChosenMs = 1;  // 0 means "not yet"
+}
+
 void capeBegin() {
+  // The preset in use when the cape was last switched off.
+  settings.begin("cape", false);
+  presetNow = settings.getUChar("preset", 0);
+  if (presetNow >= PRESET_COUNT) presetNow = 0;
+
   FastLED.addLeds<WS2812B, LAPEL_ONE_PIN, GRB>(lapelOne, LAPEL_CHAIN_PIXELS);
   FastLED.addLeds<WS2812B, LAPEL_TWO_PIN, GRB>(lapelTwo, LAPEL_CHAIN_PIXELS);
   CLEDController& collarStrip = FastLED.addLeds<WS2812B, COLLAR_PIN, GRB>(collar, COLLAR_STRIP_PIXELS);
@@ -849,6 +901,7 @@ void capeShow(LinkState state) {
     }
   }
 
+  drawPresetSignal(now);
   FastLED.show();
 
   framesThisSecond++;

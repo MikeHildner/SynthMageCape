@@ -37,10 +37,28 @@ const uint8_t HIGHEST_NOTE = 108;
 enum class Look { Warm, NoteNames };
 const Look LOOK = Look::NoteNames;
 
-// Keys from this note up play an organ on the Kronos program in use (piano
-// below). Organ keys do not ripple: while one is held, the lapels carry a soft
-// travelling wash of its colour. 96 is C7 (60 is C4). Set to 128 for no organ keys.
-const uint8_t ORGAN_FROM_NOTE = 96;
+// Presets. A preset is one complete look: what every light does when you
+// play. Button two steps to the next one, and the cape remembers which one
+// was in use when it was switched off. The list is in Cape.cpp (PRESETS).
+//
+//     1  "Roll With The Changes - Test"
+//            The look built up to 21 Nov 2026, kept as it is for testing and
+//            comparison. Named after the Kronos program it was tried with:
+//            there, keys from C7 up play an organ (piano below), and on the
+//            cape those keys do not ripple. While one is held, the lapels
+//            carry a soft travelling wash of its colour.
+//     2  "Default"
+//            Mike's first own preset, being built. For now it is preset 1
+//            without the organ keys: every key ripples.
+//
+// No preset sets the brightness.
+uint8_t capePresetCount();
+uint8_t capePresetNumber();  // 1 for the first
+const char* capePresetName();
+
+// Steps to the next preset, round to the first after the last. For a second
+// the lapels show as many white bars as the new preset's number.
+void capeNextPreset();
 
 enum class LinkState { Scanning, Connecting, Connected };
 
@@ -48,7 +66,7 @@ void capeBegin();
 
 // A key was struck: a ripple spreads from the row for that pitch, as bright as
 // the key was struck, and the row keeps a low glow while the key is held.
-// (An organ key starts a wash instead; see ORGAN_FROM_NOTE.)
+// (An organ key starts a wash instead; see the presets above.)
 void capeNoteOn(uint8_t note, uint8_t velocity);
 void capeNoteOff(uint8_t note);
 void capeAllNotesOff();
