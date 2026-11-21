@@ -719,12 +719,17 @@ void drawNotes(uint32_t now) {
 //
 // In a preset with shouldersOnChord they also come alive on a big chord.
 // While SHOULDER_ALIVE_KEYS or more keys are held down (keys, not notes the
-// pedal is holding), every light of both epaulettes is on: it comes up
-// quickly, and the rows are shared out among the held keys, each in its own
-// colour, the lowest key at the neck and the highest at the edge. All at one
-// level, however hard the keys were struck. With fewer keys held it fades
-// out, more slowly. The wavefronts carry on throughout; where one crosses
-// the glow, a light shows the brighter of the two, not their sum.
+// pedal is holding), every light of both epaulettes is on, in one colour. It
+// comes up quickly, at one level however hard the keys were struck. The
+// colour is picked at random each time they come alive: a pure colour of the
+// wheel, so never white or pale, and at least a quarter of the wheel away
+// from the last one, so never the same twice running. It holds while keys
+// are added or swapped, as long as enough stay down; pitch bend and vibrato
+// do not turn it. With fewer keys held it fades out, more slowly. (For an
+// hour on 21 Nov the rows were shared out among the held keys, each in its
+// own colour; Mike wanted one solid colour.) The wavefronts carry on
+// throughout; where one crosses the glow, a light shows the brighter of the
+// two, not their sum.
 //
 // The ruler that tested the wiring is in git history (drawShoulderRuler,
 // commit 8748bdb and before).
@@ -756,18 +761,27 @@ void updateShoulderGlow(float elapsedMs) {
     memset(shoulderGlow, 0, sizeof(shoulderGlow));
     return;
   }
-  // The keys held, lowest first. More than one a row cannot be shown.
-  uint8_t held[SHOULDER_ROWS];
-  uint8_t count = 0;
-  for (uint8_t note = 0; note < 128 && count < SHOULDER_ROWS; note++) {
-    if (heldVelocity[note] > 0) held[count++] = note;
+  uint8_t count = 0;  // keys held
+  for (uint8_t note = 0; note < 128 && count < SHOULDER_ALIVE_KEYS; note++) {
+    if (heldVelocity[note] > 0) count++;
   }
   const bool alive = count >= SHOULDER_ALIVE_KEYS;
+
+  // A new colour each time they come alive: 64 to 192 steps round the
+  // 256-step wheel from the last one. random() here draws on the chip's
+  // hardware random numbers, so the order differs every time.
+  static bool wasAlive = false;
+  static uint8_t hue = (uint8_t)random(256);
+  if (alive && !wasAlive) hue += (uint8_t)random(64, 193);
+  wasAlive = alive;
+  const CRGB pure = CHSV(hue, 255, 255);
+  const Colour colour = {(float)pure.r, (float)pure.g, (float)pure.b};
+
   const float attack = 1.0f - expf(-elapsedMs / SHOULDER_ALIVE_ATTACK_MS);
   const float release = 1.0f - expf(-elapsedMs / SHOULDER_ALIVE_RELEASE_MS);
   for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
     Colour target = {0, 0, 0};
-    if (alive) addColour(target, colourOfNote(held[row * count / SHOULDER_ROWS]), SHOULDER_ALIVE_LEVEL);
+    if (alive) addColour(target, colour, SHOULDER_ALIVE_LEVEL);
     Colour& shown = shoulderGlow[row];
     const bool rising = target.r + target.g + target.b > shown.r + shown.g + shown.b;
     const float step = rising ? attack : release;
