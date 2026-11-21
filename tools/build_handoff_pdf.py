@@ -80,7 +80,7 @@ def wiring_drawing():
     (x 60 to 660, y 14 to 624, y downwards), then scaled to the page width.
     """
     SRC_W, SRC_H = 600, 610
-    scale = 0.86 * CONTENT_W / SRC_W  # a little under full width, so the table below it fits on the page
+    scale = 0.76 * CONTENT_W / SRC_W  # a little under full width, so the table below it fits on the page
     drawing = Drawing(SRC_W * scale, SRC_H * scale)
     drawing.hAlign = "CENTER"
     g = Group(transform=(scale, 0, 0, scale, 0, 0))
@@ -131,11 +131,13 @@ def wiring_drawing():
     g.add(Polygon(pts(275, 100, 350, 120, 420, 520, 275, 520), fillColor=PANEL, strokeColor=GREY, strokeWidth=0.5))
     line(118, 336, 382, 336, GREY, 0.5)
 
-    # Strip lights: collar halves, shoulders, lapels.
+    # Strip lights: the collar (one piece), shoulders (two rows each), lapels.
     poly(LIGHT, 3, 225, 100, 225, 60, 231, 52, 240, 47, 250, 46)
     poly(LIGHT, 3, 275, 100, 275, 60, 269, 52, 260, 47, 250, 46)
     line(160, 121, 200, 110, LIGHT, 3)
+    line(161.6, 126.8, 201.6, 115.8, LIGHT, 3)
     line(300, 110, 340, 121, LIGHT, 3)
+    line(298.4, 115.8, 338.4, 126.8, LIGHT, 3)
     for x in (212, 219, 281, 288):
         line(x, 118, x, 298, LIGHT, 3)
 
@@ -149,24 +151,28 @@ def wiring_drawing():
         dot(x, y, 3, LIGHT)
         dot(500 - x, y, 3, LIGHT)
 
-    # Cables.
-    poly(CABLE, 2, 190, 316, 194, 135, 206, 113)
+    # Cables. From the pouch: to the near shoulder, to the collar's front
+    # edge, to the near lapel, and along the belt to the far lapel. The far
+    # shoulder is fed by the link behind the neck.
+    poly(CABLE, 2, 182, 316, 186, 140, 197, 114)
+    poly(CABLE, 2, 191, 316, 203, 130, 222, 103)
     line(200, 316, 214, 309, CABLE, 2)
     line(200, 350, 312, 350, CABLE, 2, dash=[6, 4])
     line(312, 350, 288, 309, CABLE, 2)
-    poly(CABLE, 2, 312, 350, 306, 135, 294, 113)
+    line(205, 109, 298, 109, CABLE, 2, dash=[6, 4])
 
     # The pouch, and the four plug-in points.
     g.add(Rect(X(140), Y(356), 60, 40, rx=4, ry=4, fillColor=colors.HexColor("#D3D1C7"), strokeColor=GREY,
                strokeWidth=0.5))
     text(170, 340, "Pouch", anchor="middle", bold=True)
-    for x, y in ((208, 110), (292, 110), (216, 306), (285, 306)):
+    for x, y in ((199, 111), (224, 101), (216, 306), (285, 306)):
         dot(x, y, 5, CABLE)
 
-    label(280, 66, 446, 66, "Collar light, two halves")
-    label(346, 120, 446, 120, "Shoulder strip")
+    label(280, 66, 446, 66, "Collar light, one piece")
+    label(270, 109, 446, 92, "Link behind the neck")
+    label(346, 122, 446, 122, "Shoulder strips, two rows")
     label(294, 200, 446, 200, "Lapel lights")
-    label(312, 250, 446, 250, "Cable inside the lining")
+    label(200, 250, 446, 250, "Two cables inside the lining")
     label(292, 306, 446, 300, "Lapel plug, string plugs in too")
     label(318, 352, 446, 350, "Around the back, on the belt")
     label(382, 336, 446, 396, "Belt, worn under the cape")
@@ -182,7 +188,7 @@ def wiring_drawing():
         dot(x, 584, 3, LIGHT)
     text(118, 588, "String lights")
     line(220, 584, 250, 584, CABLE, 2, dash=[6, 4])
-    text(258, 588, "Cable on the belt, around the back")
+    text(258, 588, "Cable behind Mike: belt, or neck")
     dot(95, 610, 5, CABLE)
     text(118, 614, "Plug-in point")
     return drawing
@@ -325,7 +331,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#777777"))
-    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / 18 November 2026")
+    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / revised 21 November 2026")
     canvas.drawRightString(PAGE_W - MARGIN, 0.5 * inch, f"Page {doc.page}")
     canvas.restoreState()
 
