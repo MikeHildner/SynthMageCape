@@ -9,7 +9,7 @@ const uint8_t LAPEL_ONE_PIN = 4;
 const uint8_t LAPEL_TWO_PIN = 5;
 // The LED on the ESP32 board itself (GPIO 48) is not driven. The chip has
 // four LED outputs, and the cape uses all four. Output 4 (GPIO 7) carries
-// the shoulders (see drawShoulderRuler).
+// the shoulders (see drawShoulders).
 // The hem row of the lapels shows the link state instead.
 
 const uint8_t ROWS = 48;
@@ -498,18 +498,18 @@ struct Runner {
   float strength;    // 0..1 as it leaves the lapel
   uint32_t startMs;  // when it leaves the lapel; in the future while the wavefront is still on its way
 };
-Runner runners[16];
+Runner runners[16];          // dots on the strings
+Runner shoulderRunners[16];  // wavefronts on the shoulders (see "the shoulders" below)
 
-// A key was struck at `row` with `strength`: book the dot that its downward
-// wavefront becomes.
-void launchRunner(uint8_t note, float row, float strength, uint32_t struckMs) {
-  const float travelMs = row / RIPPLE_ROWS_PER_MS;  // the wavefront's time to the lapel bottom
-  if (travelMs >= RIPPLE_LIFE_MS) return;           // it dies on the lapel
+// Books a runner in `list` for a wavefront that needs `travelMs` to reach the
+// end of the lapel. A wavefront that dies on the lapel books nothing.
+void bookRunner(Runner (&list)[16], uint8_t note, float travelMs, float strength, uint32_t struckMs) {
+  if (travelMs >= RIPPLE_LIFE_MS) return;
   const float remaining = 1.0f - travelMs / RIPPLE_LIFE_MS;
 
   // Reuse a finished runner, or failing that the oldest one.
-  Runner* slot = &runners[0];
-  for (Runner& runner : runners) {
+  Runner* slot = &list[0];
+  for (Runner& runner : list) {
     if (!runner.active) {
       slot = &runner;
       break;
@@ -520,6 +520,14 @@ void launchRunner(uint8_t note, float row, float strength, uint32_t struckMs) {
   slot->note = note;
   slot->strength = strength * remaining * remaining;  // the ripple's own fade
   slot->startMs = struckMs + (uint32_t)travelMs;
+}
+
+// A key was struck at `row` with `strength`. Its ripple has two wavefronts:
+// the one going down becomes a dot on the string, the one going up becomes a
+// wavefront on the shoulder.
+void launchRunners(uint8_t note, float row, float strength, uint32_t struckMs) {
+  bookRunner(runners, note, row / RIPPLE_ROWS_PER_MS, strength, struckMs);
+  bookRunner(shoulderRunners, note, ((ROWS - 1) - row) / RIPPLE_ROWS_PER_MS, strength, struckMs);
 }
 
 void strandsDark() {
@@ -630,39 +638,66 @@ void drawNotes(uint32_t now) {
   drawSparkle(notesSounding, elapsed);
 }
 
-// ---- the shoulders (bench test, temporary)
+// ---- the shoulders
 //
 // Epaulettes: on each shoulder two rows of 12 LEDs of the lapel strip, side by
 // side, built like a short lapel. Row one runs from the neck out to the
-// shoulder edge (LEDs 1-12), a U-turn, then row two runs back to the neck
-// (13-24). Both shoulders are chained on output 4: the cable from the board
-// reaches shoulder one at its neck end, and a short link behind the neck
-// carries on from the end of its row two to shoulder two.
+// shoulder edge (LEDs 0-11), a U-turn, then row two runs back to the neck
+// (12-23). So a shoulder "row" (0 at the neck, 11 at the edge) is two LEDs:
+// `row` and `23 - row`. Both shoulders are chained on output 4: the cable from
+// the board reaches shoulder one at its neck end, and a short link behind the
+// neck carries on from the end of its row two to shoulder two.
 //
-// For now they show a ruler, the same on each shoulder, always on, whether or
-// not the Kronos is connected:
-//     LED 1 red, 2 green, 3 blue    the start of row one, and the colour order
-//     LEDs 4 to 11 dim blue
-//     LEDs 12 and 13 white          either side of the U-turn, at the shoulder edge
-//     LEDs 14 to 23 dim blue
-//     LED 24 yellow                 the end of row two, back at the neck beside the red
-// A whole ruler on a shoulder means its wiring and its count are right.
+// What they show is the mirror of the strings. A struck key also sends a
+// wavefront up the lapel. When it reaches the top it runs off onto the
+// shoulders: a wavefront of the note's colour crosses each epaulette from the
+// neck to the edge, fading as it goes. It starts as bright as the lapel's
+// wavefront was when it left, so high notes send bright ones, a note from the
+// middle of the keyboard a faint one, and low notes none. Organ keys do not
+// ripple, so they send none either. Both shoulders show the same. With
+// nothing played they are dark.
+//
+// The ruler that tested the wiring is in git history (drawShoulderRuler,
+// commit 0ca52fb and before).
 const uint8_t SHOULDER_PIN = 7;  // output 4 on the shifter board
 const uint8_t SHOULDER_ROWS = 12;
 const uint8_t LEDS_PER_SHOULDER = 2 * SHOULDER_ROWS;
 const uint8_t SHOULDER_PIXELS = 2 * LEDS_PER_SHOULDER;
 CRGB shoulders[SHOULDER_PIXELS];
 
-void drawShoulderRuler() {
+const float SHOULDER_LIFE_MS = 450;          // how long a wavefront lasts: just past the edge
+const float SHOULDER_ROWS_PER_MS = 0.030f;   // how fast it crosses: 30 rows, half a metre, a second
+const float SHOULDER_WIDTH_ROWS = 2.0f;      // its softness
+
+void shouldersDark() { fill_solid(shoulders, SHOULDER_PIXELS, CRGB::Black); }
+
+void drawShoulders(uint32_t now) {
+  Colour rows[SHOULDER_ROWS] = {};
+  for (Runner& runner : shoulderRunners) {
+    if (!runner.active) continue;
+    const int32_t age = (int32_t)(now - runner.startMs);
+    if (age < 0) continue;  // its wavefront is still on the lapel
+    if (age >= SHOULDER_LIFE_MS) {
+      runner.active = false;
+      continue;
+    }
+    const float level = runner.strength * (1.0f - age / SHOULDER_LIFE_MS);
+    const float position = age * SHOULDER_ROWS_PER_MS;
+    const Colour colour = colourOfNote(runner.note);
+    for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
+      const float distance = fabsf((float)row - position);
+      if (distance < SHOULDER_WIDTH_ROWS) {
+        addColour(rows[row], colour, level * (1.0f - distance / SHOULDER_WIDTH_ROWS));
+      }
+    }
+  }
   for (uint8_t shoulder = 0; shoulder < 2; shoulder++) {
     CRGB* leds = shoulders + shoulder * LEDS_PER_SHOULDER;
-    fill_solid(leds, LEDS_PER_SHOULDER, CRGB(0, 0, 40));
-    leds[0] = CRGB(120, 0, 0);
-    leds[1] = CRGB(0, 120, 0);
-    leds[2] = CRGB(0, 0, 120);
-    leds[SHOULDER_ROWS - 1] = CRGB(80, 80, 80);
-    leds[SHOULDER_ROWS] = CRGB(80, 80, 80);
-    leds[LEDS_PER_SHOULDER - 1] = CRGB(110, 80, 0);
+    for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
+      const CRGB colour = toLeds(rows[row]);
+      leds[row] = colour;
+      leds[LEDS_PER_SHOULDER - 1 - row] = colour;
+    }
   }
 }
 
@@ -707,7 +742,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
   slot->row = rowOfNote(note);
   slot->strength = velocity / 127.0f;
   slot->startMs = millis();
-  launchRunner(note, slot->row, slot->strength, slot->startMs);
+  launchRunners(note, slot->row, slot->strength, slot->startMs);
 }
 
 void capeNoteOff(uint8_t note) {
@@ -769,6 +804,7 @@ void capeAllNotesOff() {
   pedalDown = false;
   for (Ripple& ripple : ripples) ripple.active = false;
   for (Runner& runner : runners) runner.active = false;
+  for (Runner& runner : shoulderRunners) runner.active = false;
 }
 
 void capeShow(LinkState state) {
@@ -788,6 +824,7 @@ void capeShow(LinkState state) {
     fill_solid(lapelOne, LEDS_PER_LAPEL, CRGB::Black);
     fill_solid(lapelTwo, LEDS_PER_LAPEL, CRGB::Black);
     strandsDark();
+    shouldersDark();
     setRow(0, lit ? CRGB(0, 0, 120) : CRGB::Black);
     collarDark();
     if (lit) collarMarks(0, CRGB(0, 0, 120));
@@ -795,6 +832,7 @@ void capeShow(LinkState state) {
     updateHueShift(now);
     drawNotes(now);
     drawStrands(now);
+    drawShoulders(now);
     drawCollar(now);
 
     // Just connected: one soft green wavefront climbs the lapels, so the
@@ -811,7 +849,6 @@ void capeShow(LinkState state) {
     }
   }
 
-  drawShoulderRuler();
   FastLED.show();
 
   framesThisSecond++;
