@@ -63,6 +63,9 @@ const Look LOOK = Look::NoteNames;
 //            every light on, in one colour picked at random each time.
 //            With fewer they fade out and show the wavefronts as in
 //            preset 1.
+//            Joystick up (vibrato) makes the lapels, the strings and
+//            the shoulders sparkle, more the further it is pushed. Not
+//            the collar.
 //
 // No preset sets the brightness.
 uint8_t capePresetCount();
@@ -94,7 +97,8 @@ void capeBend(int bend);
 
 // The mod wheel moved (controller 1, 0-127; joystick up on the Kronos, which
 // adds vibrato). The colour of everything that is lit swings to and fro,
-// six times a second, wider the further the joystick is pushed.
+// six times a second, wider the further the joystick is pushed. In the
+// Default preset it also makes everything but the collar sparkle.
 void capeModulation(uint8_t value);
 
 // Aftertouch: how hard the held keys are being pressed down after they were

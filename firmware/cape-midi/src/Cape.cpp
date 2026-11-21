@@ -83,10 +83,11 @@ struct Preset {
   bool dotsFullTrip;      // the strings: every key sends a dot that makes the full trip (see "the strings")
   bool collarOnPressure;  // the collar is dark except under aftertouch (see "the collar")
   bool shouldersOnChord;  // the shoulders come alive while four or more keys are held (see "the shoulders")
+  bool sparkleOnJoystick; // joystick up makes everything but the collar sparkle (see "sparkle from the joystick")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96, false, false, false},  // 96 is C7 (60 is C4)
-    {"Default", 128, true, true, true},
+    {"Roll With The Changes - Test", 96, false, false, false, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true, true, true, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
@@ -233,44 +234,56 @@ const uint8_t SPARKLE_SATURATION_COLOUR = 200; // NoteNames look: coloured, a li
 float sparkle[2][LEDS_PER_LAPEL];       // 0..1, per LED, per lapel
 uint8_t sparkleHue[2][LEDS_PER_LAPEL];  // NoteNames look: each sparkle's own hue
 
-void drawSparkle(uint8_t notesSounding, float elapsedMs) {
+// One patch of sparkle: `count` LEDs in a row, starting at `leds`, with their
+// own `levels` (0..1) and `hues`. Starts `perSecond` new sparkles a second
+// somewhere in the patch, fades the old ones, and adds them all on top of
+// what is already drawn there.
+void sparklePatch(CRGB* leds, float* levels, uint8_t* hues, uint8_t count, float perSecond, float elapsedMs) {
   // New sparkles for this frame. The fractional part becomes a probability.
-  float rate = 0;
-  if (notesSounding >= SPARKLE_FROM_NOTES) {
-    const float span = SPARKLE_FULL_AT_NOTES - SPARKLE_FROM_NOTES + 1;
-    rate = SPARKLES_PER_SECOND * min(1.0f, (notesSounding - SPARKLE_FROM_NOTES + 1) / span);
-  }
-  float due = rate * elapsedMs / 1000.0f;
+  float due = perSecond * elapsedMs / 1000.0f;
   while (due > 0) {
     if (due >= 1 || random8() < (uint8_t)(due * 255)) {
-      const uint8_t lapel = random8(2);
-      const uint8_t led = random8(LEDS_PER_LAPEL);
-      sparkle[lapel][led] = 0.5f + random8() / 510.0f;  // 0.5 to 1
-      sparkleHue[lapel][led] = random8();
+      const uint8_t led = random8(count);
+      levels[led] = 0.5f + random8() / 510.0f;  // 0.5 to 1
+      hues[led] = random8();
     }
     due -= 1;
   }
 
   // Fade the old ones and add them on top of what is already drawn.
   const float keep = expf(-elapsedMs / SPARKLE_FADE_MS);
-  CRGB* const lapels[2] = {lapelOne, lapelTwo};
-  for (uint8_t lapel = 0; lapel < 2; lapel++) {
-    for (uint8_t i = 0; i < LEDS_PER_LAPEL; i++) {
-      float& level = sparkle[lapel][i];
-      if (level == 0) continue;
-      level *= keep;
-      if (level < 0.02f) {
-        level = 0;
-        continue;
-      }
-      const uint8_t value = (uint8_t)(255 * level);
-      if (LOOK == Look::NoteNames) {
-        lapels[lapel][i] += CHSV((uint8_t)(sparkleHue[lapel][i] + hueShift), SPARKLE_SATURATION_COLOUR, value);
-      } else {
-        lapels[lapel][i] += CHSV((uint8_t)(BASE_HUE + hueShift), SPARKLE_SATURATION, value);
-      }
+  for (uint8_t i = 0; i < count; i++) {
+    float& level = levels[i];
+    if (level == 0) continue;
+    level *= keep;
+    if (level < 0.02f) {
+      level = 0;
+      continue;
+    }
+    const uint8_t value = (uint8_t)(255 * level);
+    if (LOOK == Look::NoteNames) {
+      leds[i] += CHSV((uint8_t)(hues[i] + hueShift), SPARKLE_SATURATION_COLOUR, value);
+    } else {
+      leds[i] += CHSV((uint8_t)(BASE_HUE + hueShift), SPARKLE_SATURATION, value);
     }
   }
+}
+
+// How far the joystick is up, 0..1, in a preset where that makes things
+// sparkle; 0 in any other.
+float sparkleFromJoystick() { return PRESETS[presetNow].sparkleOnJoystick ? vibratoDepth : 0.0f; }
+
+void drawSparkle(uint8_t notesSounding, float elapsedMs) {
+  float rate = 0;
+  if (notesSounding >= SPARKLE_FROM_NOTES) {
+    const float span = SPARKLE_FULL_AT_NOTES - SPARKLE_FROM_NOTES + 1;
+    rate = SPARKLES_PER_SECOND * min(1.0f, (notesSounding - SPARKLE_FROM_NOTES + 1) / span);
+  }
+  // The joystick asks for sparkle too. The lapels show whichever asks for
+  // more, not both added up.
+  rate = fmaxf(rate, SPARKLES_PER_SECOND * sparkleFromJoystick());
+  sparklePatch(lapelOne, sparkle[0], sparkleHue[0], LEDS_PER_LAPEL, rate / 2, elapsedMs);
+  sparklePatch(lapelTwo, sparkle[1], sparkleHue[1], LEDS_PER_LAPEL, rate / 2, elapsedMs);
 }
 
 // Adds the organ keys' wash to every row.
@@ -837,6 +850,52 @@ void drawShoulders(uint32_t now) {
   }
 }
 
+// ---- sparkle from the joystick, below and above the lapels
+//
+// In a preset with sparkleOnJoystick, pushing the joystick up (controller 1,
+// the mod wheel; on the Kronos it adds vibrato) makes the cape sparkle for as
+// long as it is up, and more the further it is pushed: the lapels (see
+// drawSparkle), the lights of the strings that show, and the shoulders. Not
+// the collar. A sparkle is one light flashing briefly in a colour of its own,
+// on top of whatever that light is showing. It needs no note to be sounding.
+// The two strings sparkle each for itself, and so do the two shoulders.
+const float STRAND_SPARKLES_PER_SECOND = 10;    // at full joystick, both strings together
+const float SHOULDER_SPARKLES_PER_SECOND = 12;  // at full joystick, both shoulders together
+
+float strandSparkle[2][STRAND_PATH_LIGHTS];  // 0..1, per string, per light on the path
+uint8_t strandSparkleHue[2][STRAND_PATH_LIGHTS];
+float shoulderSparkle[SHOULDER_PIXELS];
+uint8_t shoulderSparkleHue[SHOULDER_PIXELS];
+
+void joystickSparkleOff() {
+  memset(strandSparkle, 0, sizeof(strandSparkle));
+  memset(shoulderSparkle, 0, sizeof(shoulderSparkle));
+}
+
+// Call after the strings and the shoulders are drawn.
+void drawJoystickSparkle(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  const float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+  const float depth = sparkleFromJoystick();
+
+  // Each string in two patches, the front edge and the outer line, so that
+  // the crossing between them stays dark. Each patch gets its share of the
+  // rate by its number of lights.
+  const float perLight = STRAND_SPARKLES_PER_SECOND * depth / (2 * (STRAND_FRONT_LIGHTS + STRAND_OUTER_LIGHTS));
+  CRGB* const strings[2] = {lapelOne + LEDS_PER_LAPEL, lapelTwo + LEDS_PER_LAPEL};
+  for (uint8_t s = 0; s < 2; s++) {
+    sparklePatch(strings[s], strandSparkle[s], strandSparkleHue[s], STRAND_FRONT_LIGHTS,
+                 perLight * STRAND_FRONT_LIGHTS, elapsed);
+    sparklePatch(strings[s] + STRAND_OUTER_FROM, strandSparkle[s] + STRAND_OUTER_FROM,
+                 strandSparkleHue[s] + STRAND_OUTER_FROM, STRAND_OUTER_LIGHTS, perLight * STRAND_OUTER_LIGHTS,
+                 elapsed);
+  }
+
+  sparklePatch(shoulders, shoulderSparkle, shoulderSparkleHue, SHOULDER_PIXELS,
+               SHOULDER_SPARKLES_PER_SECOND * depth, elapsed);
+}
+
 // ---- which preset: the signal on the lapels
 //
 // Button two just chose a preset. For a little over a second the lapels show
@@ -983,6 +1042,7 @@ void capeAllNotesOff() {
   memset(sustainLevel, 0, sizeof(sustainLevel));
   memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
+  joystickSparkleOff();
   memset(collarNow, 0, sizeof(collarNow));
   collarOpen = false;
   memset(shoulderGlow, 0, sizeof(shoulderGlow));
@@ -1018,6 +1078,7 @@ void capeShow(LinkState state) {
     drawNotes(now);
     drawStrands(now);
     drawShoulders(now);
+    drawJoystickSparkle(now);
     drawCollar(now);
 
     // Just connected: one soft green wavefront climbs the lapels, so the
