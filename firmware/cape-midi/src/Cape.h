@@ -58,7 +58,8 @@ const Look LOOK = Look::NoteNames;
 //            it, so every key should show in both places.
 //            The collar is dark, except while a held key is pressed
 //            down harder (aftertouch; see capeChannelPressure).
-//            The shoulders come alive while four or more keys are held:
+//            The shoulders come alive once four or more keys have been
+//            held for half a second, and stay so while they are held:
 //            every light on, in one colour picked at random each time.
 //            With fewer they fade out and show the wavefronts as in
 //            preset 1.

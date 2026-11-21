@@ -718,8 +718,11 @@ void drawNotes(uint32_t now) {
 // nothing played they are dark.
 //
 // In a preset with shouldersOnChord they also come alive on a big chord.
-// While SHOULDER_ALIVE_KEYS or more keys are held down (keys, not notes the
-// pedal is holding), every light of both epaulettes is on, in one colour. It
+// Once SHOULDER_ALIVE_KEYS or more keys (keys, not notes the pedal is
+// holding) have been down together for SHOULDER_ALIVE_AFTER_MS, and for as
+// long as that many stay down, every light of both epaulettes is on, in one
+// colour. A chord that is struck and let go sooner does nothing here, and
+// dropping below that many keys, even for a moment, starts the wait again. It
 // comes up quickly, at one level however hard the keys were struck. The
 // colour is picked at random each time they come alive: a pure colour of the
 // wheel, so never white or pale, and at least a quarter of the wheel away
@@ -744,6 +747,7 @@ const float SHOULDER_ROWS_PER_MS = 0.030f;   // how fast it crosses: 30 rows, ha
 const float SHOULDER_WIDTH_ROWS = 2.0f;      // its softness
 
 const uint8_t SHOULDER_ALIVE_KEYS = 4;        // shouldersOnChord: this many keys held brings them alive
+const uint32_t SHOULDER_ALIVE_AFTER_MS = 500; // once they have been held this long
 const float SHOULDER_ALIVE_LEVEL = 0.35f;     // how bright then, 0..1 of the ceiling
 const float SHOULDER_ALIVE_ATTACK_MS = 60;    // it comes up this fast
 const float SHOULDER_ALIVE_RELEASE_MS = 300;  // and falls away this fast
@@ -756,7 +760,7 @@ void shouldersDark() {
 }
 
 // Moves the chord glow one frame on.
-void updateShoulderGlow(float elapsedMs) {
+void updateShoulderGlow(uint32_t now, float elapsedMs) {
   if (!PRESETS[presetNow].shouldersOnChord) {
     memset(shoulderGlow, 0, sizeof(shoulderGlow));
     return;
@@ -765,7 +769,13 @@ void updateShoulderGlow(float elapsedMs) {
   for (uint8_t note = 0; note < 128 && count < SHOULDER_ALIVE_KEYS; note++) {
     if (heldVelocity[note] > 0) count++;
   }
-  const bool alive = count >= SHOULDER_ALIVE_KEYS;
+  // Enough keys, and for long enough?
+  static bool enough = false;
+  static uint32_t enoughSinceMs = 0;
+  const bool enoughNow = count >= SHOULDER_ALIVE_KEYS;
+  if (enoughNow && !enough) enoughSinceMs = now;
+  enough = enoughNow;
+  const bool alive = enough && now - enoughSinceMs >= SHOULDER_ALIVE_AFTER_MS;
 
   // A new colour each time they come alive: 64 to 192 steps round the
   // 256-step wheel from the last one. random() here draws on the chip's
@@ -793,7 +803,7 @@ void updateShoulderGlow(float elapsedMs) {
 
 void drawShoulders(uint32_t now) {
   static uint32_t lastDrawMs = now;
-  updateShoulderGlow((float)(now - lastDrawMs));
+  updateShoulderGlow(now, (float)(now - lastDrawMs));
   lastDrawMs = now;
 
   Colour rows[SHOULDER_ROWS] = {};
