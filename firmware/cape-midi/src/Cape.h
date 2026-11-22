@@ -77,6 +77,14 @@ const Look LOOK = Look::NoteNames;
 //            with the joystick up. See "the Purple Rain preset" in
 //            Cape.cpp.
 //
+//     4  "Finale"
+//            More is more. Everything Default does, and on top of it
+//            the whole cape is lit and moving: bands of colour stream
+//            through the strings, lapels and shoulders towards the
+//            collar, and the collar swirls. Playing drives it up:
+//            brighter, faster, with sparkle. Inside the same
+//            brightness ceiling. See "the Finale preset" in Cape.cpp.
+//
 // No preset sets the brightness.
 uint8_t capePresetCount();
 uint8_t capePresetNumber();  // 1 for the first

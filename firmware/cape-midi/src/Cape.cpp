@@ -85,16 +85,19 @@ struct Preset {
   bool shouldersOnChord;  // the shoulders come alive while four or more keys are held (see "the shoulders")
   bool sparkleOnJoystick; // joystick up makes everything but the collar sparkle (see "sparkle from the joystick")
   bool rain;              // a look of its own, and the fields above do not apply (see "the Purple Rain preset")
+  bool finale;            // everything lit and moving on top of the rest (see "the Finale preset")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96, false, false, false, false, false},  // 96 is C7 (60 is C4)
-    {"Default", 128, true, true, true, true, false},
-    {"Purple Rain", 128, false, false, false, false, true},
+    {"Roll With The Changes - Test", 96, false, false, false, false, false, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true, true, true, true, false, false},
+    {"Purple Rain", 128, false, false, false, false, true, false},
+    {"Finale", 128, true, false, true, true, false, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
 uint32_t presetChosenMs = 0;   // when button two last chose one; 0 for not yet
 Preferences settings;          // the cape's small permanent store: survives power off
+float finaleEnergy = 0;        // the Finale preset: how worked up it is, 0..1 (see "the Finale preset")
 
 bool isOrganNote(uint8_t note) { return note >= PRESETS[presetNow].organFromNote; }
 
@@ -280,8 +283,12 @@ void sparklePatch(CRGB* leds, float* levels, uint8_t* hues, uint8_t count, float
 }
 
 // How far the joystick is up, 0..1, in a preset where that makes things
-// sparkle; 0 in any other.
-float sparkleFromJoystick() { return PRESETS[presetNow].sparkleOnJoystick ? vibratoDepth : 0.0f; }
+// sparkle; 0 in any other. In the Finale preset its energy counts as well,
+// whichever is more.
+float sparkleFromJoystick() {
+  if (!PRESETS[presetNow].sparkleOnJoystick) return 0;
+  return PRESETS[presetNow].finale ? fmaxf(vibratoDepth, finaleEnergy) : vibratoDepth;
+}
 
 void drawSparkle(uint8_t notesSounding, float elapsedMs) {
   float rate = 0;
@@ -1148,6 +1155,129 @@ void drawRain(uint32_t now) {
   drawRainCloud(elapsed, fminf(1.0f, (float)sounding / RAIN_CLOUD_FULL_AT_NOTES));
 }
 
+// ---- the Finale preset
+//
+// More is more. Everything the Default preset does on the lapels, the strings
+// and the shoulders still happens, and on top of it the whole cape is lit and
+// moving, also with nothing played:
+//
+//     the stream   Bands of colour travel through every light towards the
+//                  collar: from the top of each string's outer line, round
+//                  and up its front edge, up the lapels, and in along the
+//                  shoulders from edge to neck. A rainbow about 1.2 m long,
+//                  with a bright crest every 40 cm.
+//     the swirl    The collar turns: three bright arms in a rainbow, running
+//                  round the neck from one collar bottom to the other.
+//     the energy   One number, 0..1, drives it all. Every key struck kicks
+//                  it up, harder keys more; notes sounding hold it up; with
+//                  nothing played it settles over a couple of seconds. More
+//                  energy: the stream and the swirl are brighter and faster,
+//                  and everything but the collar sparkles (the joystick adds
+//                  to that as in Default).
+//
+// It is big inside the same brightness ceiling as every other preset: more
+// lights, more of the time, at higher levels. The ceiling itself is not
+// touched. Pitch bend and the joystick turn the colours as usual.
+const float FINALE_KICK = 0.14f;              // energy added by a key struck as hard as can be
+const float FINALE_HELD_ENERGY = 0.6f;        // energy that notes sounding hold up...
+const uint8_t FINALE_HELD_FULL_AT_NOTES = 6;  // ...with this many or more
+const float FINALE_CALM_MS = 1500;            // it settles this fast
+const float FINALE_IDLE_LEVEL = 0.10f;        // the stream at no energy, 0..1 of the ceiling
+const float FINALE_FULL_LEVEL = 0.45f;        // and at full energy
+const float FINALE_IDLE_CM_PER_S = 18;        // its speed at no energy
+const float FINALE_FULL_CM_PER_S = 75;        // and at full energy
+const float FINALE_RAINBOW_CM = 120;          // length of one rainbow along the stream
+const float FINALE_BAND_CM = 40;              // from one bright crest to the next; divides the rainbow's length
+const float FINALE_SHOULDER_AT_CM = 80;       // where the stream reaches a shoulder's edge: level with the lapel top
+const float FINALE_COLLAR_IDLE_LEVEL = 0.18f; // the swirl at no energy
+const float FINALE_COLLAR_FULL_LEVEL = 0.60f; // and at full energy
+const float FINALE_IDLE_TURNS_PER_S = 0.25f;  // how fast it turns at no energy
+const float FINALE_FULL_TURNS_PER_S = 1.4f;   // and at full energy
+const uint8_t FINALE_ARMS = 3;                // bright arms round the collar
+
+void finaleKick(uint8_t velocity) { finaleEnergy = fminf(1.0f, finaleEnergy + FINALE_KICK * velocity / 127.0f); }
+
+// Adds the stream to the lapels, strings and shoulders, which are already
+// drawn, and draws the collar. Call before the joystick sparkle.
+void drawFinale(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+  if (elapsed > 100) elapsed = 100;  // coming back to this preset is not one long frame
+
+  // The energy: held up by the notes sounding, settling when they stop.
+  uint8_t sounding = 0;
+  for (uint8_t note = 0; note < 128; note++) {
+    if (heldVelocity[note] > 0 || sustainLevel[note] > 0) sounding++;
+  }
+  const float held = FINALE_HELD_ENERGY * min(sounding, FINALE_HELD_FULL_AT_NOTES) / FINALE_HELD_FULL_AT_NOTES;
+  const float pace = finaleEnergy > held ? FINALE_CALM_MS : 250.0f;
+  finaleEnergy += (held - finaleEnergy) * (1.0f - expf(-elapsed / pace));
+  const float energy = finaleEnergy;
+
+  // The stream. `flowCm` is how far it has travelled; a place `atCm` along it
+  // shows what was `flowCm` further back a moment ago, so the bands move
+  // towards larger `atCm`: towards the collar.
+  static float flowCm = 0;
+  flowCm += elapsed / 1000.0f * (FINALE_IDLE_CM_PER_S + (FINALE_FULL_CM_PER_S - FINALE_IDLE_CM_PER_S) * energy);
+  if (flowCm > FINALE_RAINBOW_CM) flowCm -= FINALE_RAINBOW_CM;
+  const float level = FINALE_IDLE_LEVEL + (FINALE_FULL_LEVEL - FINALE_IDLE_LEVEL) * energy;
+  auto stream = [&](float atCm) -> CRGB {
+    const float along = atCm - flowCm;
+    const float band = 0.45f + 0.55f * (0.5f + 0.5f * sinf(along * (TWO_PI / FINALE_BAND_CM)));
+    // Turning a negative number into a uint8_t wraps it round the wheel.
+    const uint8_t hue = (uint8_t)((int)lroundf(along * (256.0f / FINALE_RAINBOW_CM)) + hueShift);
+    return CHSV(hue, 255, (uint8_t)(255 * level * band));
+  };
+
+  // The lapels: 0 cm at the hem row.
+  for (uint8_t row = 0; row < ROWS; row++) {
+    const CRGB colour = stream(row * RAIN_ROW_CM);
+    lapelOne[row] += colour;
+    lapelOne[LEDS_PER_LAPEL - 1 - row] += colour;
+    lapelTwo[row] += colour;
+    lapelTwo[LEDS_PER_LAPEL - 1 - row] += colour;
+  }
+  // The strings: below the hem, the first light 10 cm down, and so on along
+  // the path to the top of the outer line. The crossing stays dark.
+  for (uint8_t light = 0; light < STRAND_PATH_LIGHTS; light++) {
+    if (!strandLightShows(light)) continue;
+    const CRGB colour = stream(-RAIN_LIGHT_CM * (light + 1));
+    lapelOne[LEDS_PER_LAPEL + light] += colour;
+    lapelTwo[LEDS_PER_LAPEL + light] += colour;
+  }
+  // The shoulders: in from the edge to the neck.
+  for (uint8_t row = 0; row < SHOULDER_ROWS; row++) {
+    const CRGB colour = stream(FINALE_SHOULDER_AT_CM + (SHOULDER_ROWS - 1 - row) * RAIN_ROW_CM);
+    for (uint8_t shoulder = 0; shoulder < 2; shoulder++) {
+      CRGB* leds = shoulders + shoulder * LEDS_PER_SHOULDER;
+      leds[row] += colour;
+      leds[LEDS_PER_SHOULDER - 1 - row] += colour;
+    }
+  }
+
+  // The swirl. `spin` is how far the pattern has turned, in turns; it holds a
+  // whole number of arms and of rainbows, so starting a new turn shows no jump.
+  static float spin = 0;
+  spin += elapsed / 1000.0f * (FINALE_IDLE_TURNS_PER_S + (FINALE_FULL_TURNS_PER_S - FINALE_IDLE_TURNS_PER_S) * energy);
+  spin -= floorf(spin);
+  // Dithering, as in drawCollar: see the note above ditheredChannel.
+  static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
+  static uint8_t frame = 0;
+  frame ^= 1;
+  const float collarLevel = FINALE_COLLAR_IDLE_LEVEL + (FINALE_COLLAR_FULL_LEVEL - FINALE_COLLAR_IDLE_LEVEL) * energy;
+  for (uint16_t i = 0; i < COLLAR_PIXELS; i++) {
+    const float round = (float)i / COLLAR_PIXELS - spin;  // this pixel's place in the turning pattern, in turns
+    float arm = 0.5f + 0.5f * cosf(TWO_PI * FINALE_ARMS * round);
+    arm = 0.2f + 0.8f * arm * arm;  // squared: narrower arms, darker between them
+    const CRGB pure = CHSV((uint8_t)((int)lroundf(round * 256.0f) + hueShift), 255, 255);
+    const float amount = collarLevel * arm;
+    const float threshold = THRESHOLD[i & 1][frame];
+    collar[i] = CRGB(ditheredChannel(pure.r * amount, threshold), ditheredChannel(pure.g * amount, threshold),
+                     ditheredChannel(pure.b * amount, threshold));
+  }
+}
+
 // ---- which preset: the signal on the lapels
 //
 // Button two just chose a preset. For a little over a second the lapels show
@@ -1214,6 +1344,7 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
     rainStrike(note, velocity);
     return;
   }
+  if (PRESETS[presetNow].finale) finaleKick(velocity);
   if (isOrganNote(note)) return;  // organ keys wash, they do not ripple
 
   // Reuse a finished ripple, or failing that the oldest one.
@@ -1300,6 +1431,7 @@ void capeAllNotesOff() {
   memset(sparkle, 0, sizeof(sparkle));
   joystickSparkleOff();
   rainOff();
+  finaleEnergy = 0;
   memset(collarNow, 0, sizeof(collarNow));
   collarOpen = false;
   memset(shoulderGlow, 0, sizeof(shoulderGlow));
@@ -1331,6 +1463,8 @@ void capeShow(LinkState state) {
     collarDark();
     if (lit) collarMarks(0, CRGB(0, 0, 120));
   } else {
+    const bool finale = PRESETS[presetNow].finale;
+    if (!finale) finaleEnergy = 0;
     if (PRESETS[presetNow].rain) {
       drawRain(now);
     } else {
@@ -1338,8 +1472,9 @@ void capeShow(LinkState state) {
       drawNotes(now);
       drawStrands(now);
       drawShoulders(now);
+      if (finale) drawFinale(now);  // the stream on top, and the collar
       drawJoystickSparkle(now);
-      drawCollar(now);
+      if (!finale) drawCollar(now);
     }
 
     // Just connected: one soft green wavefront climbs the lapels, so the

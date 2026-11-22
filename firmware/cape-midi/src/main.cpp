@@ -35,6 +35,8 @@
 //                               are held down
 //     purple drops falling      the Purple Rain preset: it shows rain and
 //                               nothing else (see Cape.h)
+//     everything lit, streaming the Finale preset (see Cape.h)
+//     and swirling
 //     white bars on the lapels  button two just chose a preset: as many
 //                               bars as its number, for a second
 #include <Arduino.h>
