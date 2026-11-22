@@ -33,6 +33,8 @@
 //     the collar                the further it is pushed
 //     shoulders fully lit       in the Default preset: four or more keys
 //                               are held down
+//     purple drops falling      the Purple Rain preset: it shows rain and
+//                               nothing else (see Cape.h)
 //     white bars on the lapels  button two just chose a preset: as many
 //                               bars as its number, for a second
 #include <Arduino.h>

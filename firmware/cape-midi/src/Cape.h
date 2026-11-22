@@ -67,6 +67,16 @@ const Look LOOK = Look::NoteNames;
 //            the shoulders sparkle, more the further it is pushed. Not
 //            the collar.
 //
+//     3  "Purple Rain"
+//            Rain, in purples, and nothing else. Drops fall down the
+//            four columns of the lapels and on down the strings; the
+//            shoulders flash where drops land; the collar is the
+//            cloud, a deep violet that gathers while notes sound.
+//            A faint drizzle with nothing played, steady rain while
+//            notes sound, a drop for every key struck, a downpour
+//            with the joystick up. See "the Purple Rain preset" in
+//            Cape.cpp.
+//
 // No preset sets the brightness.
 uint8_t capePresetCount();
 uint8_t capePresetNumber();  // 1 for the first

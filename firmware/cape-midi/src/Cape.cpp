@@ -84,10 +84,12 @@ struct Preset {
   bool collarOnPressure;  // the collar is dark except under aftertouch (see "the collar")
   bool shouldersOnChord;  // the shoulders come alive while four or more keys are held (see "the shoulders")
   bool sparkleOnJoystick; // joystick up makes everything but the collar sparkle (see "sparkle from the joystick")
+  bool rain;              // a look of its own, and the fields above do not apply (see "the Purple Rain preset")
 };
 const Preset PRESETS[] = {
-    {"Roll With The Changes - Test", 96, false, false, false, false},  // 96 is C7 (60 is C4)
-    {"Default", 128, true, true, true, true},
+    {"Roll With The Changes - Test", 96, false, false, false, false, false},  // 96 is C7 (60 is C4)
+    {"Default", 128, true, true, true, true, false},
+    {"Purple Rain", 128, false, false, false, false, true},
 };
 const uint8_t PRESET_COUNT = sizeof(PRESETS) / sizeof(PRESETS[0]);
 uint8_t presetNow = 0;         // index into PRESETS
@@ -237,15 +239,23 @@ uint8_t sparkleHue[2][LEDS_PER_LAPEL];  // NoteNames look: each sparkle's own hu
 // One patch of sparkle: `count` LEDs in a row, starting at `leds`, with their
 // own `levels` (0..1) and `hues`. Starts `perSecond` new sparkles a second
 // somewhere in the patch, fades the old ones, and adds them all on top of
-// what is already drawn there.
-void sparklePatch(CRGB* leds, float* levels, uint8_t* hues, uint8_t count, float perSecond, float elapsedMs) {
+// what is already drawn there. A new sparkle takes any colour of the wheel,
+// or with `hueSpan` one of that many hue steps from `hueFrom`. `brightest`
+// (0..1) scales how bright a new one starts.
+void sparklePatch(CRGB* leds, float* levels, uint8_t* hues, uint8_t count, float perSecond, float elapsedMs,
+                  uint8_t hueFrom = 0, uint8_t hueSpan = 0, float brightest = 1.0f) {
+  // A preset that was not being drawn for a while comes back with one very
+  // long frame. Without this limit that frame would start every sparkle it
+  // had missed, all at once: a flash.
+  if (elapsedMs > 100) elapsedMs = 100;
+
   // New sparkles for this frame. The fractional part becomes a probability.
   float due = perSecond * elapsedMs / 1000.0f;
   while (due > 0) {
     if (due >= 1 || random8() < (uint8_t)(due * 255)) {
       const uint8_t led = random8(count);
-      levels[led] = 0.5f + random8() / 510.0f;  // 0.5 to 1
-      hues[led] = random8();
+      levels[led] = brightest * (0.5f + random8() / 510.0f);  // half to all of it
+      hues[led] = hueSpan > 0 ? (uint8_t)(hueFrom + random8(hueSpan)) : random8();
     }
     due -= 1;
   }
@@ -896,6 +906,248 @@ void drawJoystickSparkle(uint32_t now) {
                SHOULDER_SPARKLES_PER_SECOND * depth, elapsed);
 }
 
+// ---- the Purple Rain preset
+//
+// Rain, in purples, and nothing else: no ripples, no note colours.
+//
+// Drops fall. Each lapel is two columns of LEDs, so there are four columns
+// of rain on the front, each for itself. A drop starts at the top of a
+// column, falls to the hem with a short tail behind it, and carries on down
+// that side's string along the front edge. The outer line of each string has
+// drops of its own, falling from its top to its bottom.
+//
+// How hard it rains:
+//     nothing played    a thin, faint drizzle
+//     notes sounding    steady rain, heavier with every note (held keys, and
+//                       notes the pedal is holding), up to RAIN_NOTES_MOST
+//     a key struck      one drop at once, as bright as the key was struck, a
+//                       little paler than the rest so that it stands out;
+//                       low keys lean to blue-violet, high keys to magenta
+//     joystick up       a downpour, heavier the further it is pushed
+//
+// The shoulders: drops landing. Single lights flash and fade, as often as it
+// is raining, and one for every key struck.
+//
+// The collar: the cloud. Dark with nothing played; a deep violet gathers
+// slowly while notes sound and thins slowly afterwards, with a slow drift
+// along it so that it is not a flat band.
+//
+// Pitch bend and the joystick do not turn the colours here. It stays purple.
+const float RAIN_ROW_CM = 100.0f / 60;                 // the lapel strip has 60 LEDs a metre
+const float RAIN_LIGHT_CM = 10;                        // the string's lights are 10 cm apart
+const float RAIN_LAPEL_CM = (ROWS - 1) * RAIN_ROW_CM;  // from the top row to the hem row
+const float RAIN_TAIL_CM = 9;                          // a drop's tail on the lapel
+const float RAIN_SLOWEST_CM_PER_MS = 0.055f;           // each drop has its own speed: from 55 cm a second
+const float RAIN_FASTEST_CM_PER_MS = 0.095f;           // to 95
+const uint8_t RAIN_HUE_FROM = 178;                     // from blue-violet (192 is purple on the 256-step wheel)
+const uint8_t RAIN_HUE_SPAN = 30;                      // to purple leaning towards magenta
+const float RAIN_DRIZZLE_PER_SECOND = 0.6f;            // drops a second with nothing played, on the whole cape
+const float RAIN_PER_NOTE_PER_SECOND = 2.0f;           // more for each note sounding
+const uint8_t RAIN_NOTES_MOST = 6;                     // notes beyond this add no more
+const float RAIN_STORM_PER_SECOND = 14;                // more again at full joystick
+const float RAIN_PATTER_SHARE = 0.5f;                  // shoulder flashes for each drop of rain
+const uint8_t RAIN_CLOUD_HUE = 186;                    // the collar: deep violet
+const float RAIN_CLOUD_LEVEL = 0.22f;                  // at its fullest, 0..1 of the ceiling
+const uint8_t RAIN_CLOUD_FULL_AT_NOTES = 4;            // this many notes sounding gather the whole cloud
+const float RAIN_CLOUD_ATTACK_MS = 500;                // it gathers this fast
+const float RAIN_CLOUD_RELEASE_MS = 1800;              // and thins this fast
+
+// Where a drop falls. Lanes 0-3 are the lapel columns (lapel one's two, then
+// lapel two's), each running on down that lapel's string. Lanes 4 and 5 are
+// the outer lines of string one and string two.
+struct Drop {
+  bool active;
+  uint8_t lane;
+  float headCm;   // how far its head has fallen from the top of its lane
+  float cmPerMs;  // its speed
+  float level;    // 0..1
+  Colour colour;
+};
+Drop drops[48];
+
+void rainOff() {
+  for (Drop& drop : drops) drop.active = false;
+}
+
+// Starts a drop at the top of a lane picked at random. With every drop in use
+// it does nothing, unless it `must`: then the drop furthest along gives way.
+void startDrop(float level, uint8_t hue, uint8_t saturation, bool must) {
+  Drop* slot = nullptr;
+  for (Drop& drop : drops) {
+    if (!drop.active) {
+      slot = &drop;
+      break;
+    }
+  }
+  if (slot == nullptr) {
+    if (!must) return;
+    slot = &drops[0];
+    for (Drop& drop : drops) {
+      if (drop.headCm > slot->headCm) slot = &drop;
+    }
+  }
+  // A lapel column is twice as likely as an outer line: it is the longer way.
+  const uint8_t pick = random8(10);
+  slot->active = true;
+  slot->lane = pick < 8 ? pick / 2 : 4 + (pick - 8);
+  slot->headCm = -RAIN_ROW_CM;  // just above the top light
+  slot->cmPerMs = RAIN_SLOWEST_CM_PER_MS + (RAIN_FASTEST_CM_PER_MS - RAIN_SLOWEST_CM_PER_MS) * random8() / 255.0f;
+  slot->level = level;
+  const CRGB pure = CHSV(hue, saturation, 255);
+  slot->colour = {(float)pure.r, (float)pure.g, (float)pure.b};
+}
+
+// A key was struck: its own drop, and one landing on a shoulder.
+void rainStrike(uint8_t note, uint8_t velocity) {
+  const float level = fmaxf(0.4f, velocity / 127.0f);
+  const uint8_t hue = RAIN_HUE_FROM + (uint8_t)(rowOfNote(note) * RAIN_HUE_SPAN / ROWS);
+  startDrop(level, hue, 200, true);
+  const uint8_t led = random8(SHOULDER_PIXELS);
+  shoulderSparkle[led] = 0.8f * level;
+  shoulderSparkleHue[led] = hue;
+}
+
+// How much of a drop a light shows. `behindCm` is how far the light is behind
+// the drop's head: positive in the tail, negative ahead of the head, where the
+// light comes up over `leadCm` so that the head glides instead of hopping.
+float dropShape(float behindCm, float leadCm, float tailCm) {
+  const float part = behindCm < 0 ? 1.0f + behindCm / leadCm : 1.0f - behindCm / tailCm;
+  return part > 0 ? part : 0;
+}
+
+// The collar as the cloud. `gathered` is 0..1.
+void drawRainCloud(float elapsedMs, float gathered) {
+  // Dithering, as in drawCollar: see the note above ditheredChannel.
+  static const float THRESHOLD[2][2] = {{0.125f, 0.625f}, {0.875f, 0.375f}};
+  static uint8_t frame = 0;
+  frame ^= 1;
+  static float drift = 0;  // where the slow drift is, in radians
+  drift += elapsedMs * 0.0012f;
+  if (drift > TWO_PI) drift -= TWO_PI;
+
+  const CRGB pure = CHSV(RAIN_CLOUD_HUE, 255, 255);
+  const float attack = 1.0f - expf(-elapsedMs / RAIN_CLOUD_ATTACK_MS);
+  const float release = 1.0f - expf(-elapsedMs / RAIN_CLOUD_RELEASE_MS);
+  for (uint16_t i = 0; i < COLLAR_HALF; i++) {
+    // Thicker and thinner along the collar, moving slowly towards the back.
+    const float level = RAIN_CLOUD_LEVEL * gathered * (0.7f + 0.3f * sinf(i * 0.2f - drift));
+    const Colour target = {pure.r * level, pure.g * level, pure.b * level};
+    Colour& shown = collarNow[i];
+    const bool rising = target.r + target.g + target.b > shown.r + shown.g + shown.b;
+    const float step = rising ? attack : release;
+    shown.r += (target.r - shown.r) * step;
+    shown.g += (target.g - shown.g) * step;
+    shown.b += (target.b - shown.b) * step;
+
+    const uint16_t pixels[2] = {i, (uint16_t)(COLLAR_PIXELS - 1 - i)};
+    for (const uint16_t pixel : pixels) {
+      const float threshold = THRESHOLD[pixel & 1][frame];
+      collar[pixel] = CRGB(ditheredChannel(shown.r, threshold), ditheredChannel(shown.g, threshold),
+                           ditheredChannel(shown.b, threshold));
+    }
+  }
+}
+
+// Draws every light of the cape for one frame.
+void drawRain(uint32_t now) {
+  static uint32_t lastDrawMs = now;
+  float elapsed = (float)(now - lastDrawMs);
+  lastDrawMs = now;
+  // Coming back to this preset after a while must not count as one long
+  // frame: that would start minutes' worth of rain at once.
+  if (elapsed > 100) elapsed = 100;
+  hueShift = 0;  // it stays purple
+
+  // The notes sounding: keys held, and released notes while the pedal is down.
+  if (!pedalDown) memset(sustainLevel, 0, sizeof(sustainLevel));
+  uint8_t sounding = 0;
+  for (uint8_t note = 0; note < 128; note++) {
+    if (heldVelocity[note] > 0 || sustainLevel[note] > 0) sounding++;
+  }
+
+  // New drops for this frame. The fractional part becomes a probability.
+  const float rate = RAIN_DRIZZLE_PER_SECOND + RAIN_PER_NOTE_PER_SECOND * min(sounding, RAIN_NOTES_MOST) +
+                     RAIN_STORM_PER_SECOND * vibratoDepth;
+  const bool raining = sounding > 0 || vibratoDepth > 0;
+  float due = rate * elapsed / 1000.0f;
+  while (due > 0) {
+    if (due >= 1 || random8() < (uint8_t)(due * 255)) {
+      // Drizzle is faint; rain is clearer.
+      const float level = (raining ? 0.30f : 0.15f) + (raining ? 0.30f : 0.12f) * random8() / 255.0f;
+      startDrop(level, RAIN_HUE_FROM + random8(RAIN_HUE_SPAN), 255, false);
+    }
+    due -= 1;
+  }
+
+  // Let the drops fall, and add each one to the lights of its lane.
+  static Colour columns[4][ROWS];
+  static Colour front[2][STRAND_FRONT_LIGHTS];
+  static Colour outer[2][STRAND_OUTER_LIGHTS];
+  memset(columns, 0, sizeof(columns));
+  memset(front, 0, sizeof(front));
+  memset(outer, 0, sizeof(outer));
+  for (Drop& drop : drops) {
+    if (!drop.active) continue;
+    drop.headCm += drop.cmPerMs * elapsed;
+    if (drop.lane < 4) {
+      // Down the lapel column, then down the string's front edge. The first
+      // string light is one light's spacing below the hem row.
+      if (drop.headCm > RAIN_LAPEL_CM + RAIN_LIGHT_CM * (STRAND_FRONT_LIGHTS + 1)) {
+        drop.active = false;
+        continue;
+      }
+      for (uint8_t row = 0; row < ROWS; row++) {
+        const float amount = dropShape(drop.headCm - (ROWS - 1 - row) * RAIN_ROW_CM, RAIN_ROW_CM, RAIN_TAIL_CM);
+        if (amount > 0) addColour(columns[drop.lane][row], drop.colour, drop.level * amount);
+      }
+      for (uint8_t light = 0; light < STRAND_FRONT_LIGHTS; light++) {
+        const float amount =
+            dropShape(drop.headCm - (RAIN_LAPEL_CM + RAIN_LIGHT_CM * (light + 1)), RAIN_LIGHT_CM, RAIN_LIGHT_CM);
+        if (amount > 0) addColour(front[drop.lane / 2][light], drop.colour, drop.level * amount);
+      }
+    } else {
+      // Down the outer line: its top light is the last one on the path.
+      if (drop.headCm > RAIN_LIGHT_CM * STRAND_OUTER_LIGHTS) {
+        drop.active = false;
+        continue;
+      }
+      for (uint8_t fromTop = 0; fromTop < STRAND_OUTER_LIGHTS; fromTop++) {
+        const float amount = dropShape(drop.headCm - RAIN_LIGHT_CM * fromTop, RAIN_LIGHT_CM, RAIN_LIGHT_CM);
+        if (amount > 0) {
+          addColour(outer[drop.lane - 4][STRAND_OUTER_LIGHTS - 1 - fromTop], drop.colour, drop.level * amount);
+        }
+      }
+    }
+  }
+
+  // Out to the lapels and the strings. The crossing and the spare lights of
+  // each string are sent black, as always.
+  CRGB* const lapels[2] = {lapelOne, lapelTwo};
+  for (uint8_t lapel = 0; lapel < 2; lapel++) {
+    for (uint8_t row = 0; row < ROWS; row++) {
+      lapels[lapel][row] = toLeds(columns[2 * lapel][row]);
+      lapels[lapel][LEDS_PER_LAPEL - 1 - row] = toLeds(columns[2 * lapel + 1][row]);
+    }
+    for (uint8_t light = 0; light < STRAND_LIGHTS; light++) {
+      CRGB colour = CRGB::Black;
+      if (light < STRAND_FRONT_LIGHTS) {
+        colour = toLeds(front[lapel][light]);
+      } else if (light >= STRAND_OUTER_FROM && light < STRAND_PATH_LIGHTS) {
+        colour = toLeds(outer[lapel][light - STRAND_OUTER_FROM]);
+      }
+      lapels[lapel][LEDS_PER_LAPEL + light] = colour;
+    }
+  }
+
+  // The shoulders: drops landing.
+  fill_solid(shoulders, SHOULDER_PIXELS, CRGB::Black);
+  sparklePatch(shoulders, shoulderSparkle, shoulderSparkleHue, SHOULDER_PIXELS, rate * RAIN_PATTER_SHARE, elapsed,
+               RAIN_HUE_FROM, RAIN_HUE_SPAN, raining ? 0.7f : 0.35f);
+
+  // The collar: the cloud.
+  drawRainCloud(elapsed, fminf(1.0f, (float)sounding / RAIN_CLOUD_FULL_AT_NOTES));
+}
+
 // ---- which preset: the signal on the lapels
 //
 // Button two just chose a preset. For a little over a second the lapels show
@@ -958,6 +1210,10 @@ void capeNoteOn(uint8_t note, uint8_t velocity) {
   note &= 0x7F;
   heldVelocity[note] = velocity;
   sustainLevel[note] = 0;  // struck again: the key's own glow takes over
+  if (PRESETS[presetNow].rain) {  // no ripple: a raindrop
+    rainStrike(note, velocity);
+    return;
+  }
   if (isOrganNote(note)) return;  // organ keys wash, they do not ripple
 
   // Reuse a finished ripple, or failing that the oldest one.
@@ -1043,6 +1299,7 @@ void capeAllNotesOff() {
   memset(organLevel, 0, sizeof(organLevel));
   memset(sparkle, 0, sizeof(sparkle));
   joystickSparkleOff();
+  rainOff();
   memset(collarNow, 0, sizeof(collarNow));
   collarOpen = false;
   memset(shoulderGlow, 0, sizeof(shoulderGlow));
@@ -1074,12 +1331,16 @@ void capeShow(LinkState state) {
     collarDark();
     if (lit) collarMarks(0, CRGB(0, 0, 120));
   } else {
-    updateHueShift(now);
-    drawNotes(now);
-    drawStrands(now);
-    drawShoulders(now);
-    drawJoystickSparkle(now);
-    drawCollar(now);
+    if (PRESETS[presetNow].rain) {
+      drawRain(now);
+    } else {
+      updateHueShift(now);
+      drawNotes(now);
+      drawStrands(now);
+      drawShoulders(now);
+      drawJoystickSparkle(now);
+      drawCollar(now);
+    }
 
     // Just connected: one soft green wavefront climbs the lapels, so the
     // wearer can see the link is up without looking at the box.
