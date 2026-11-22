@@ -142,7 +142,9 @@ Prices and stock checked on Amazon on 29 October 2026.
 
 ## H. Printed shifter board (added 7 November 2026, ordered the same day)
 
-The perfboard parts already on hand (DIP-14 socket, SN74AHCT125N, 220 ohm resistors, 1000 uF capacitor, pin headers) all fit the printed board. The only new parts are the screw terminals; the board itself comes from the board house.
+The perfboard parts already on hand (DIP-14 socket, SN74AHCT125N, 220 ohm resistors, 1000 uF capacitor) all fit the printed board. The only new parts are the screw terminals; the board itself comes from the board house.
+
+The six holes marked "ESP32-S3" are drawn for a 6-pin header. No pin header was ever bought for this project (this list said otherwise until 22 Nov 2026). As built, six jumper-wire halves are soldered straight into those holes, as on the perfboard. A 6-pin piece of 2.54 mm pin header fits if you would rather plug the leads on.
 
 | Item | Part | Where | Notes |
 |---|---|---|---|
