@@ -144,7 +144,7 @@ Prices and stock checked on Amazon on 29 October 2026.
 
 The perfboard parts already on hand (DIP-14 socket, SN74AHCT125N, 220 ohm resistors, 1000 uF capacitor) all fit the printed board. The only new parts are the screw terminals; the board itself comes from the board house.
 
-The six holes marked "ESP32-S3" are drawn for a 6-pin header. No pin header was ever bought for this project (this list said otherwise until 22 Nov 2026). As built, six jumper-wire halves are soldered straight into those holes, as on the perfboard. A 6-pin piece of 2.54 mm pin header fits if you would rather plug the leads on.
+The six holes marked "ESP32-S3" are drawn for a 6-pin header. No pin header was ever bought for this project (this list said otherwise until 22 Nov 2026). The first printed board was built with six jumper-wire halves soldered straight into those holes, as on the perfboard; that board was scrapped on 23 Nov 2026 over a faulty 2-pin screw terminal. A strip of 2.54 mm pin header was bought afterwards, so the second board gets a 6-pin piece of it and the leads plug on.
 
 | Item | Part | Where | Notes |
 |---|---|---|---|
