@@ -31,3 +31,7 @@ firmware/cape-midi/include/BuildStamp.h
 
 # Working notes for the build (a private running log, not part of the published project)
 docs/next-steps.md
+
+# The handoff PDF as sent to people: it carries a name, e-mail address and
+# telephone number on its first page. The copy in docs/ has none.
+docs/to-send/

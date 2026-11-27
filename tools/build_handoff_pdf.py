@@ -1,4 +1,15 @@
-"""Build the designer handoff PDF from docs/designer-handoff.md plus two renders."""
+"""Build the designer handoff PDF from docs/designer-handoff.md plus two renders.
+
+    python tools/build_handoff_pdf.py docs
+
+Writes docs/Synth_Mage_Designer_Handoff.pdf, the copy kept in the repository,
+which carries no contact details.
+
+If docs/to-send/contact.txt exists (the folder is ignored by git), a second
+copy is written beside it with those lines on the first page. That is the
+copy to send to people. One detail per line, for example a name, an e-mail
+address and a telephone number.
+"""
 import re
 import sys
 from pathlib import Path
@@ -28,7 +39,10 @@ OUT = DOCS / "Synth_Mage_Designer_Handoff.pdf"
 IMG_ON = DOCS / "renders" / "lights-on-front.png"
 IMG_OFF = DOCS / "renders" / "lights-off-zone-map.png"
 IMG_VIDEO = DOCS / "renders" / "video-thumbnail.png"
-VIDEO_URL = "https://youtu.be/ja1__TgNOSs"
+VIDEO_URL = "https://youtu.be/IYe8foX2Wks"
+PRIVATE = DOCS / "to-send"            # ignored by git
+CONTACT = PRIVATE / "contact.txt"
+VERSION = "27 November 2026"
 
 PAGE_W, PAGE_H = letter
 MARGIN = 0.8 * inch
@@ -41,6 +55,7 @@ H2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", font
 H3 = ParagraphStyle("h3", parent=ss["Heading3"], fontName="Helvetica-Bold", fontSize=11, leading=14, spaceBefore=10, spaceAfter=4)
 SMALL = ParagraphStyle("small", parent=BODY, fontSize=9, leading=12, textColor=colors.HexColor("#555555"))
 CAPTION = ParagraphStyle("cap", parent=SMALL, alignment=TA_CENTER, spaceBefore=4)
+CONTACT_STYLE = ParagraphStyle("contact", parent=BODY, fontSize=10.5, leading=14, spaceAfter=8)
 CELL = ParagraphStyle("cell", parent=BODY, fontSize=9, leading=12, spaceAfter=0)
 CELL_B = ParagraphStyle("cellb", parent=CELL, fontName="Helvetica-Bold")
 
@@ -308,13 +323,13 @@ def video_block():
     thumb.drawHeight = thumb.imageHeight * thumb_w / thumb.imageWidth
     thumb.drawWidth = thumb_w
     text = [
-        Paragraph("Video: the working lapels", H3),
+        Paragraph("Video: the lights following the keyboard", H3),
         Paragraph(
-            "A short clip of the two lapel light pieces on a stand-in cape, following what Mike plays "
-            "on the keyboard. This is the real hardware, not a render. A webcam flattens the colours; "
+            "A 15-second clip of the working lights on a stand-in cape, following what Mike plays "
+            "on the keyboard. This is the real hardware, not a render. A camera flattens the colours; "
             "they are richer to the eye.",
             BODY),
-        # Not underlined: an underline would hide the two underscores in the address.
+        # Not underlined: an underline can hide underscores in an address.
         Paragraph(f"<a href='{VIDEO_URL}' color='#1a55aa'>{VIDEO_URL}</a>", BODY),
     ]
     t = Table([[thumb, text]], colWidths=[thumb_w + 0.25 * inch, CONTENT_W - thumb_w - 0.25 * inch])
@@ -331,17 +346,32 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#777777"))
-    canvas.drawString(MARGIN, 0.5 * inch, "Synth Mage cape / handoff for the cape maker / revised 21 November 2026")
+    canvas.drawString(MARGIN, 0.5 * inch, f"Synth Mage cape / handoff for the cape maker / {VERSION}")
     canvas.drawRightString(PAGE_W - MARGIN, 0.5 * inch, f"Page {doc.page}")
     canvas.restoreState()
 
 
-def build():
+def contact_line(details):
+    """The contact details as one line: the name in bold, an e-mail address as a link."""
+    parts = []
+    for n, detail in enumerate(details):
+        text = inline(detail)
+        if "@" in detail and " " not in detail:
+            text = f"<a href='mailto:{detail}' color='#1a55aa'>{text}</a>"
+        elif n == 0:
+            text = f"<b>{text}</b>"
+        parts.append(text)
+    return Paragraph("Contact: " + " &nbsp;|&nbsp; ".join(parts), CONTACT_STYLE)
+
+
+def build(out, contact=None):
     md = MD.read_text(encoding="utf-8")
     story = []
 
     # Page 1: reference images side by side
     story.append(Paragraph("Synth Mage Cape: Reference Images", H1))
+    if contact:
+        story.append(contact_line(contact))
     story.append(Paragraph(
         "Two concept renders to read alongside the handoff that follows. The lit image shows the look from "
         "the audience at the keyboard. The unlit image is the construction reference: the lighter charcoal "
@@ -366,13 +396,16 @@ def build():
     story.extend(parse_markdown(md))
 
     doc = SimpleDocTemplate(
-        str(OUT), pagesize=letter,
+        str(out), pagesize=letter,
         leftMargin=MARGIN, rightMargin=MARGIN, topMargin=0.75 * inch, bottomMargin=0.8 * inch,
         title="Synth Mage Cape: Designer Handoff", author="Mike Hildner",
     )
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
-    print(f"wrote {OUT}")
+    print(f"wrote {out}")
 
 
 if __name__ == "__main__":
-    build()
+    build(OUT)
+    if CONTACT.exists():
+        details = [line.strip() for line in CONTACT.read_text(encoding="utf-8").splitlines() if line.strip()]
+        build(PRIVATE / OUT.name, details)
