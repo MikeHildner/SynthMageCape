@@ -8,7 +8,7 @@ strings of small lights below the lapels.
 ![Concept render: the cape lit, from the audience](docs/renders/lights-on-front.png)
 
 The picture is a concept render, not a photograph. A short video of the real
-lapels following the keyboard: https://youtu.be/ja1__TgNOSs
+lights on a stand-in cape, following the keyboard: https://youtu.be/IYe8foX2Wks
 
 ## Where the project stands (November 2026)
 
